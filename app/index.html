@@ -246,6 +246,15 @@ const cogsSold = () => S.sales.reduce((s,x)=>{const p=S.products.find(p=>p.id===
 
 /* ---------- KASSA ---------- */
 function sell(p){
+  const unavailable=Object.entries(p.recipe).find(([id,qty])=>{
+    const ingredient=ing(id);
+    return !ingredient || ingredient.stock<qty;
+  });
+  if(unavailable){
+    const ingredient=ing(unavailable[0]);
+    showToast('Продажа отменена', ingredient?`Недостаточно: ${ingredient.name}`:'Ингредиент не найден');
+    return;
+  }
   for(const [k,q] of Object.entries(p.recipe)){ ing(k).stock -= q; }
   S.sales.push({productId:p.id, ts:Date.now()});
   save(); renderAll();
@@ -307,12 +316,21 @@ function renderStock(){
 
 /* ---------- INVENTORY ---------- */
 function renderInv(){
+  if(!S.inv || !S.inv.snapshot || S.inv.completed){
+    S.inv={
+      snapshot:Object.fromEntries(S.ingredients.map(i=>[i.id,i.stock])),
+      actual:{},
+      completed:false,
+    };
+    save();
+  }
   const t=document.getElementById('invTable');
   const rows=S.ingredients.map(i=>{
-    const actual = S.inv && S.inv[i.id]!=null ? S.inv[i.id] : '';
+    const stock=S.inv.snapshot[i.id];
+    const actual=S.inv.actual[i.id]??'';
     return `<tr data-id="${i.id}">
       <td class="nm">${i.name}</td>
-      <td class="num">${fmt(i.stock)} ${i.unit}</td>
+      <td class="num">${fmt(stock)} ${i.unit}</td>
       <td><input type="number" inputmode="numeric" value="${actual}" placeholder="—"> <span class="muted">${i.unit}</span></td>
       <td class="varcell num">—</td>
       <td class="leakcell num">—</td>
@@ -330,7 +348,7 @@ function recalcInv(){
     const i=ing(tr.dataset.id); const inp=tr.querySelector('input');
     const varcell=tr.querySelector('.varcell'); const leakcell=tr.querySelector('.leakcell');
     if(inp.value===''){varcell.textContent='—';varcell.className='varcell num';leakcell.textContent='—';leakcell.className='leakcell num';return;}
-    const actual=parseFloat(inp.value)||0; const diff=i.stock-actual; // >0 = утекло
+    const actual=parseFloat(inp.value)||0; const diff=S.inv.snapshot[i.id]-actual; // >0 = утекло
     const leak=Math.max(0,diff)*i.cost;
     varcell.textContent=(diff>0?'−':diff<0?'+':'')+fmt(Math.abs(diff))+' '+i.unit;
     varcell.className='varcell num '+(diff>0?'var-leak':'var-ok');
@@ -342,18 +360,19 @@ function recalcInv(){
   if(tot){tot.textContent=fmt(total)+' сом'; tot.className='num '+(total>0?'var-leak':'var-ok');}
 }
 function applyInv(){
-  S.inv={};
+  S.inv.actual={};
   document.querySelectorAll('#invTable tbody tr').forEach(tr=>{
-    const inp=tr.querySelector('input'); if(inp.value!=='') S.inv[tr.dataset.id]=parseFloat(inp.value)||0;
+    const inp=tr.querySelector('input'); if(inp.value!=='') S.inv.actual[tr.dataset.id]=parseFloat(inp.value)||0;
   });
+  S.inv.completed=true;
   save(); renderDash(); switchView('dash');
 }
-function fillTheory(){ document.querySelectorAll('#invTable tbody tr').forEach(tr=>{tr.querySelector('input').value=Math.round(ing(tr.dataset.id).stock);}); recalcInv(); }
+function fillTheory(){ document.querySelectorAll('#invTable tbody tr').forEach(tr=>{tr.querySelector('input').value=Math.round(S.inv.snapshot[tr.dataset.id]);}); recalcInv(); }
 function simLeak(){
   // реалистичная недостача: чуть меньше, чем по системе
   const gaps={milk:420, beans:35, cup:6, syrup:60, cocoa:18};
   document.querySelectorAll('#invTable tbody tr').forEach(tr=>{
-    const i=ing(tr.dataset.id); tr.querySelector('input').value=Math.max(0,Math.round(i.stock-(gaps[i.id]||0)));
+    const i=ing(tr.dataset.id); tr.querySelector('input').value=Math.max(0,Math.round(S.inv.snapshot[i.id]-(gaps[i.id]||0)));
   });
   recalcInv();
 }
@@ -367,15 +386,16 @@ function renderDash(){
   document.getElementById('dCups').textContent=S.sales.length;
   const big=document.getElementById('leakBig'), exp=document.getElementById('leakExp');
   const bl=document.getElementById('breakList');
-  if(!S.inv){
+  if(!S.inv || !S.inv.completed){
     big.textContent='—'; big.className='big ok';
     exp.innerHTML='Сделай <b>инвентаризацию</b> — и Эсеп покажет, сколько денег утекло помимо проданных чашек.';
     bl.innerHTML='<div class="muted" style="font-size:14px">Сделай инвентаризацию, чтобы увидеть разбивку утечки по продуктам.</div>';
     return;
   }
   const items=S.ingredients.map(i=>{
-    const actual=S.inv[i.id]!=null?S.inv[i.id]:i.stock;
-    const diff=Math.max(0,i.stock-actual); return {i, leak:diff*i.cost, diff};
+    const stock=S.inv.snapshot[i.id];
+    const actual=S.inv.actual[i.id]??stock;
+    const diff=Math.max(0,stock-actual); return {i, leak:diff*i.cost, diff};
   });
   const total=items.reduce((s,x)=>s+x.leak,0);
   if(total>0){
