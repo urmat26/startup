@@ -1,0 +1,11 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Эсеп">
+  <rect width="64" height="64" rx="14" fill="#241A15"/>
+  <!-- ручка -->
+  <path d="M44 26 a9 9 0 0 1 0 14" stroke="#FAF6F1" stroke-width="4" fill="none" stroke-linecap="round"/>
+  <!-- корпус чашки -->
+  <path d="M16 22 H46 L42.8 45 a4 4 0 0 1 -4 3.5 H23.2 a4 4 0 0 1 -4 -3.5 Z" fill="#FAF6F1" stroke="#FAF6F1" stroke-width="2" stroke-linejoin="round"/>
+  <!-- уровень кофе (crema) -->
+  <path d="M22 29 H40" stroke="#E0A458" stroke-width="5" stroke-linecap="round"/>
+  <!-- деления -->
+  <path d="M24 35 H31 M24 40 H28" stroke="#241A15" stroke-width="2.5" stroke-linecap="round" opacity="0.55"/>
+</svg>

@@ -1,0 +1,331 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Эсеп — питч</title>
+<link rel="icon" href="../brand/favicon.svg">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&family=Inter:wght@400;500;600&display=swap');
+
+  :root{
+    --espresso:#241A15;
+    --cream:#FAF6F1;
+    --crema:#E0A458;
+    --crema-deep:#C8863A;
+    --leak:#D64545;
+    --money:#2E9E6B;
+    --gray:#8A7E75;
+    --line:rgba(36,26,21,.14);
+    --display:'Manrope','Segoe UI',system-ui,sans-serif;
+    --body:'Inter','Segoe UI',system-ui,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    font-family:var(--body);
+    background:var(--espresso);
+    color:var(--espresso);
+    overflow:hidden;
+    -webkit-font-smoothing:antialiased;
+  }
+  .deck{position:fixed;inset:0}
+
+  /* ---- measuring rail (signature) ---- */
+  .rail{
+    position:fixed;left:0;top:0;bottom:0;width:88px;
+    background:var(--espresso);
+    display:flex;flex-direction:column;align-items:center;
+    padding:26px 0;z-index:40;
+  }
+  .rail .mark{
+    font-family:var(--display);font-weight:700;font-size:13px;
+    color:var(--cream);opacity:.85;letter-spacing:.5px;
+  }
+  .rail .scale{flex:1;display:flex;flex-direction:column;justify-content:space-between;
+    align-items:center;margin:18px 0;position:relative;width:100%}
+  .rail .tick{
+    width:26px;height:3px;border-radius:2px;background:rgba(250,246,241,.28);
+    transition:all .35s ease;cursor:pointer;position:relative;
+  }
+  .rail .tick.long{width:40px}
+  .rail .tick.active{background:var(--crema);width:46px;height:4px}
+  .rail .tick.done{background:rgba(224,164,88,.55)}
+  .rail .cupwrap{width:44px;height:44px}
+
+  /* ---- slides ---- */
+  .stage{position:fixed;left:88px;right:0;top:0;bottom:0;background:var(--cream)}
+  .slide{
+    position:absolute;inset:0;
+    display:flex;flex-direction:column;justify-content:center;
+    padding:clamp(28px,6vw,96px);
+    opacity:0;visibility:hidden;transform:translateY(14px);
+    transition:opacity .5s ease,transform .5s ease,visibility .5s;
+  }
+  .slide.active{opacity:1;visibility:visible;transform:none}
+  .eyebrow{
+    font-family:var(--display);font-weight:700;font-size:13px;letter-spacing:2.5px;
+    text-transform:uppercase;color:var(--crema-deep);margin-bottom:22px;
+    display:flex;align-items:center;gap:12px;
+  }
+  .eyebrow::before{content:"";width:28px;height:3px;background:var(--crema);border-radius:2px}
+  h1{font-family:var(--display);font-weight:800;line-height:1.02;letter-spacing:-1.5px;
+    font-size:clamp(34px,6vw,74px)}
+  h2{font-family:var(--display);font-weight:800;line-height:1.05;letter-spacing:-1px;
+    font-size:clamp(28px,4.4vw,52px)}
+  p.lead{font-size:clamp(17px,1.9vw,23px);line-height:1.5;color:#4a3c34;max-width:40ch;margin-top:20px}
+  .num{font-variant-numeric:tabular-nums;font-family:var(--display)}
+
+  /* money hero */
+  .money-hero{display:flex;flex-direction:column;gap:6px;margin:10px 0 4px}
+  .money-hero .big{font-family:var(--display);font-weight:800;font-size:clamp(52px,10vw,124px);
+    letter-spacing:-3px;line-height:.95;font-variant-numeric:tabular-nums}
+  .arrow-row{display:flex;align-items:baseline;gap:clamp(14px,3vw,42px);flex-wrap:wrap}
+  .to{color:var(--gray);font-size:clamp(28px,5vw,60px);font-weight:700;font-family:var(--display)}
+  .leak-txt{color:var(--leak)}
+  .q{font-family:var(--display);font-weight:700;font-size:clamp(22px,3vw,38px);margin-top:18px;color:var(--espresso)}
+
+  .logo-wm{display:flex;align-items:baseline;gap:2px;font-family:var(--display);font-weight:800;
+    font-size:clamp(44px,8vw,92px);letter-spacing:-3px;color:var(--espresso)}
+  .logo-wm .dot{width:.19em;height:.19em;border-radius:50%;background:var(--crema);align-self:flex-end;margin-bottom:.14em;margin-left:.06em}
+  .tagline{font-size:clamp(16px,2vw,22px);color:var(--gray);margin-top:14px;font-weight:500}
+
+  /* three cards */
+  .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:34px;max-width:1000px}
+  .card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:24px}
+  .card .k{font-family:var(--display);font-weight:800;font-size:clamp(26px,3.4vw,40px);
+    font-variant-numeric:tabular-nums;letter-spacing:-1px}
+  .card .l{color:var(--gray);font-size:15px;margin-top:8px;line-height:1.4}
+  .card.crema .k{color:var(--crema-deep)} .card.money .k{color:var(--money)} .card.leak .k{color:var(--leak)}
+
+  ul.points{margin-top:28px;max-width:52ch;display:flex;flex-direction:column;gap:16px}
+  ul.points li{list-style:none;display:flex;gap:14px;font-size:clamp(16px,1.8vw,21px);line-height:1.45;color:#3a2e28}
+  ul.points li b{color:var(--espresso)}
+  ul.points .tk{flex:none;width:22px;height:3px;background:var(--crema);border-radius:2px;margin-top:.7em}
+
+  /* loop */
+  .loop{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:34px}
+  .step{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px 18px;
+    font-weight:600;font-size:clamp(14px,1.5vw,18px)}
+  .step.hero{background:var(--espresso);color:var(--cream);border-color:var(--espresso)}
+  .chev{color:var(--crema-deep);font-weight:800;font-size:20px}
+
+  /* table */
+  table{border-collapse:collapse;margin-top:30px;width:100%;max-width:920px;font-size:clamp(13px,1.5vw,17px)}
+  th,td{text-align:left;padding:13px 16px;border-bottom:1px solid var(--line)}
+  thead th{font-family:var(--display);font-weight:800;color:var(--espresso)}
+  thead th:last-child{color:var(--crema-deep)}
+  tbody td:first-child{color:var(--gray);font-weight:600}
+  .yes{color:var(--money);font-weight:700} .no{color:var(--leak);font-weight:700}
+  td.us{background:rgba(224,164,88,.14);font-weight:700}
+
+  .demo-big{font-family:var(--display);font-weight:800;font-size:clamp(80px,18vw,220px);
+    letter-spacing:-6px;line-height:.9;color:var(--espresso)}
+  .demo-sub{font-size:clamp(18px,2.4vw,28px);color:var(--gray);margin-top:8px;max-width:36ch}
+  .demo-big .dot{color:var(--crema)}
+
+  .roadmap{display:flex;flex-direction:column;gap:0;margin-top:30px;max-width:760px}
+  .rm{display:flex;gap:20px;align-items:flex-start;padding:16px 0;border-bottom:1px solid var(--line)}
+  .rm .stage-n{font-family:var(--display);font-weight:800;color:var(--crema-deep);font-variant-numeric:tabular-nums;min-width:52px;font-size:20px}
+  .rm .rt{font-weight:700;font-size:clamp(16px,1.8vw,20px)}
+  .rm .rd{color:var(--gray);font-size:14px;margin-top:3px}
+
+  .foot{position:fixed;right:26px;bottom:20px;z-index:41;display:flex;align-items:center;gap:16px}
+  .counter{font-family:var(--display);font-weight:700;color:var(--espresso);font-variant-numeric:tabular-nums;font-size:14px}
+  .nav{display:flex;gap:8px}
+  .nav button{width:38px;height:38px;border-radius:10px;border:1px solid var(--line);background:#fff;
+    cursor:pointer;font-size:17px;color:var(--espresso);transition:.2s}
+  .nav button:hover{background:var(--crema);border-color:var(--crema)}
+  .nav button:focus-visible{outline:3px solid var(--crema-deep);outline-offset:2px}
+  .src{color:var(--gray);font-size:12.5px;margin-top:26px;max-width:60ch;line-height:1.5}
+
+  @media (max-width:720px){
+    .rail{width:56px} .stage{left:56px}
+    .cards{grid-template-columns:1fr} .loop{gap:8px}
+  }
+  @media (prefers-reduced-motion:reduce){
+    .slide{transition:opacity .01s} .tick{transition:none}
+  }
+</style>
+</head>
+<body>
+<div class="deck">
+  <!-- signature rail -->
+  <aside class="rail" aria-hidden="true">
+    <div class="cupwrap">
+      <svg viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M8 12 H36 L33 33 a3 3 0 0 1-3 2.7 H14 a3 3 0 0 1-3-2.7 Z" fill="#FAF6F1"/>
+        <path d="M11 18 H33" stroke="#E0A458" stroke-width="4" stroke-linecap="round"/>
+        <path d="M14 24 H22 M14 28 H19" stroke="#241A15" stroke-width="2" stroke-linecap="round" opacity=".5"/>
+      </svg>
+    </div>
+    <div class="scale" id="scale"></div>
+    <div class="mark">учёт</div>
+  </aside>
+
+  <main class="stage" id="stage">
+
+    <!-- 1 -->
+    <section class="slide active">
+      <div class="logo-wm">эсеп<span class="dot"></span></div>
+      <div class="tagline">Касса и склад для кофеен, которыми реально пользуются</div>
+      <div class="money-hero" style="margin-top:48px">
+        <div class="arrow-row">
+          <span class="big num">50 000<span style="font-size:.4em;font-weight:700;color:var(--gray)"> сом выручка</span></span>
+        </div>
+        <div class="arrow-row">
+          <span class="big num leak-txt">40 000<span style="font-size:.4em;font-weight:700;color:var(--gray)"> на закуп</span></span>
+        </div>
+      </div>
+      <div class="q">Куда делись деньги?</div>
+    </section>
+
+    <!-- 2 -->
+    <section class="slide">
+      <div class="eyebrow">Проблема</div>
+      <h1>90% функций систем учёта<br>никто не использует</h1>
+      <ul class="points">
+        <li><span class="tk"></span><span><b>Кассу</b> — используют. «Пробить заказ, отнести чек».</span></li>
+        <li><span class="tk"></span><span><b>Склад, техкарты, себестоимость</b> — мёртвый функционал.</span></li>
+        <li><span class="tk"></span><span>Между «пробить чек» и «вести склад» — <b>пропасть</b>, в которую проваливается вся ценность.</span></li>
+      </ul>
+      <p class="src">iiko настраивает склад через техподдержку — им всё равно не пользуются. Проблема не в отсутствии функций, а в том, что ими невозможно пользоваться: UI под товароведа, которого в кофейне нет.</p>
+    </section>
+
+    <!-- 3 -->
+    <section class="slide">
+      <div class="eyebrow">Сколько это стоит</div>
+      <h2>Норма закупа кофейни — 15–20%.<br>Здесь — 80%.</h2>
+      <div class="cards">
+        <div class="card crema"><div class="k num">15–20%</div><div class="l">Нормальный food cost кофейни на напитках</div></div>
+        <div class="card leak"><div class="k num">~80%</div><div class="l">Закуп в нашем кейсе — в 4 раза выше нормы</div></div>
+        <div class="card leak"><div class="k num">до 20%</div><div class="l">прибыли съедают потери; 75% усушки — воровство персонала</div></div>
+      </div>
+      <p class="src">Владелец не может отличить: деньги лежат на складе или утекли. Эсеп разделяет — сколько ушло в чашки, сколько на полке, сколько украдено.</p>
+    </section>
+
+    <!-- 4 -->
+    <section class="slide">
+      <div class="eyebrow">Рынок</div>
+      <h2>Молодой рынок, растёт взрывом</h2>
+      <div class="cards">
+        <div class="card money"><div class="k num">+53%</div><div class="l">Общепит Бишкека за год: 2 247 → 3 440 (2ГИС, 2024)</div></div>
+        <div class="card crema"><div class="k num">×5</div><div class="l">Импорт кофе за 3 года. Потребление 1,36 кг/чел vs 4,85 в Казахстане</div></div>
+        <div class="card"><div class="k num">98%</div><div class="l">Проникновение интернета — инфраструктура под облако готова</div></div>
+      </div>
+      <p class="src">TAM ~$2,3M · SAM ~$0,83M · SOM ~$72–100K ARR/год (кофейни + малые кафе КР). Источники: 2ГИС / economist.kg, Нацстатком / kaktus.media, 24.kg.</p>
+    </section>
+
+    <!-- 5 -->
+    <section class="slide">
+      <div class="eyebrow">Решение</div>
+      <h2>Склад ведёт себя сам</h2>
+      <div class="loop">
+        <span class="step">Продал</span><span class="chev">→</span>
+        <span class="step">Само списалось</span><span class="chev">→</span>
+        <span class="step">Остаток</span><span class="chev">→</span>
+        <span class="step">Сигнал закупки</span><span class="chev">→</span>
+        <span class="step hero">Расхождение = утечка</span>
+      </div>
+      <p class="lead">Бариста не делает ничего лишнего — списание это <b>побочный эффект продажи</b>. А владелец впервые видит, куда уходят деньги: должно было уйти X, реально ушло Y, разница — в сомах.</p>
+    </section>
+
+    <!-- 6 -->
+    <section class="slide" style="align-items:flex-start;justify-content:center">
+      <div class="eyebrow">Живьём</div>
+      <div class="demo-big">DEMO<span class="dot">.</span></div>
+      <div class="demo-sub">Продажа → авто-списание → сигнал → расхождение → дашборд. Кульминация: «Вот куда делись твои деньги. Больше не на глаз.»</div>
+    </section>
+
+    <!-- 7 -->
+    <section class="slide">
+      <div class="eyebrow">Почему не Poster / iiko</div>
+      <h2>Они дали функции. Мы даём использование.</h2>
+      <table>
+        <thead><tr><th></th><th>iiko / R-Keeper</th><th>Poster</th><th>Эсеп</th></tr></thead>
+        <tbody>
+          <tr><td>Цена</td><td>4 590–9 690 сом/мес</td><td>$14–59/мес</td><td class="us">Freemium</td></tr>
+          <tr><td>Сложность</td><td class="no">под товароведа</td><td>широкий POS</td><td class="us">радикально простой</td></tr>
+          <tr><td>Детектор утечки</td><td class="no">нет</td><td class="no">нет</td><td class="us yes">ядро продукта</td></tr>
+          <tr><td>Локальность</td><td>реселлеры</td><td>частично</td><td class="us">кыргызский · ГНС · WhatsApp</td></tr>
+        </tbody>
+      </table>
+      <p class="src">Существование Poster доказывает, что рынок есть — иностранцы не локализуют то, на что нет спроса. Наш ответ на «чем ты лучше Poster?» — не «дешевле», а «ими не пользуются, а мы делаем так, чтобы пользовались».</p>
+    </section>
+
+    <!-- 8 -->
+    <section class="slide">
+      <div class="eyebrow">Бизнес-модель</div>
+      <h2>Freemium: заходим кассой, зарабатываем на складе</h2>
+      <div class="cards">
+        <div class="card"><div class="k">Бесплатно</div><div class="l">Касса — низкий барьер захода, рост базы</div></div>
+        <div class="card crema"><div class="k">Подписка</div><div class="l">Склад, аналитика, детектор утечки — где живёт боль</div></div>
+        <div class="card money"><div class="k num">$72–100K</div><div class="l">SOM ARR за 2–3 года при 8–12% SAM</div></div>
+      </div>
+      <p class="lead">Оплата в сомах, местная поддержка в WhatsApp. Моат — простота и близость, а не цена.</p>
+    </section>
+
+    <!-- 9 -->
+    <section class="slide">
+      <div class="eyebrow">Роадмап</div>
+      <h2>От детектора утечки — к замку на клиента</h2>
+      <div class="roadmap">
+        <div class="rm"><div class="stage-n">01</div><div><div class="rt">Фискализация ГНС / онлайн-ККМ</div><div class="rd">Без неё кофейне нельзя работать — это регуляторный замок</div></div></div>
+        <div class="rm"><div class="stage-n">02</div><div><div class="rt">Приёмка накладных и поставщики</div><div class="rd">Замкнуть «факт закупа» — точнее считать утечку</div></div></div>
+        <div class="rm"><div class="stage-n">03</div><div><div class="rt">Мультиточка, роли, аналитика</div><div class="rd">Рост от одной кофейни к сети</div></div></div>
+        <div class="rm"><div class="stage-n">04</div><div><div class="rt">Бары и кафе с кухней</div><div class="rd">Расширение сегмента на том же движке простоты</div></div></div>
+      </div>
+    </section>
+
+    <!-- 10 -->
+    <section class="slide" style="justify-content:center">
+      <div class="logo-wm">эсеп<span class="dot"></span></div>
+      <div class="tagline">Твои деньги — на виду</div>
+      <p class="lead" style="margin-top:34px">Я не гуглил эту проблему — я в ней работал. Соло + ИИ собрал рабочее демо за неделю.<br><br><b>Дайте кофейням наконец пользоваться тем, за что они платят.</b></p>
+    </section>
+
+  </main>
+
+  <div class="foot">
+    <span class="counter" id="counter">01 / 10</span>
+    <div class="nav">
+      <button id="prev" aria-label="Назад">‹</button>
+      <button id="next" aria-label="Вперёд">›</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const slides=[...document.querySelectorAll('.slide')];
+  const scale=document.getElementById('scale');
+  const counter=document.getElementById('counter');
+  let i=0;
+  // build rail ticks
+  slides.forEach((_,n)=>{
+    const t=document.createElement('div');
+    t.className='tick'+(n%2?'':' long');
+    t.addEventListener('click',()=>go(n));
+    scale.appendChild(t);
+  });
+  const ticks=[...scale.children];
+  function pad(n){return String(n+1).padStart(2,'0')}
+  function render(){
+    slides.forEach((s,n)=>s.classList.toggle('active',n===i));
+    ticks.forEach((t,n)=>{
+      t.classList.toggle('active',n===i);
+      t.classList.toggle('done',n<i);
+    });
+    counter.textContent=pad(i)+' / '+pad(slides.length-1);
+  }
+  function go(n){i=Math.max(0,Math.min(slides.length-1,n));render()}
+  document.getElementById('next').onclick=()=>go(i+1);
+  document.getElementById('prev').onclick=()=>go(i-1);
+  addEventListener('keydown',e=>{
+    if(e.key==='ArrowRight'||e.key===' '||e.key==='PageDown'){e.preventDefault();go(i+1)}
+    if(e.key==='ArrowLeft'||e.key==='PageUp'){e.preventDefault();go(i-1)}
+    if(e.key==='Home')go(0); if(e.key==='End')go(slides.length-1);
+  });
+  render();
+</script>
+</body>
+</html>
