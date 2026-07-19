@@ -1,0 +1,18 @@
+<svg width="320" height="96" viewBox="0 0 320 96" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Эсеп — касса и склад для кофеен">
+  <!-- Icon: чашка = шкала/уровень -->
+  <g>
+    <!-- ручка -->
+    <path d="M62 40 a13 13 0 0 1 0 20" stroke="#241A15" stroke-width="5" fill="none" stroke-linecap="round"/>
+    <!-- корпус чашки (слегка сужается книзу) -->
+    <path d="M22 34 H64 L59.5 66 a5 5 0 0 1 -5 4.4 H31.5 a5 5 0 0 1 -5 -4.4 Z" fill="#FAF6F1" stroke="#241A15" stroke-width="5" stroke-linejoin="round"/>
+    <!-- уровень кофе (crema) — «шкала» -->
+    <path d="M25.5 44 H60.5" stroke="#E0A458" stroke-width="6" stroke-linecap="round"/>
+    <!-- деления шкалы -->
+    <path d="M31 52 H41 M31 59 H37" stroke="#241A15" stroke-width="3" stroke-linecap="round" opacity="0.55"/>
+  </g>
+
+  <!-- Wordmark -->
+  <text x="92" y="63" font-family="Manrope, Inter, 'Segoe UI', sans-serif" font-size="46" font-weight="800" letter-spacing="-1" fill="#241A15">эсеп</text>
+  <!-- акцент-точка (crema) — «точка» после слова -->
+  <circle cx="205" cy="60" r="6" fill="#E0A458"/>
+</svg>
