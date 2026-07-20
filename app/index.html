@@ -31,6 +31,8 @@
   .tabs button.on{background:var(--crema);color:var(--espresso)}
   .tabs button:focus-visible{outline:2px solid var(--crema);outline-offset:2px}
   .spacer{flex:1}
+  .role{background:#3a2a20;border:1px solid rgba(250,246,241,.22);color:var(--cream);
+    padding:8px 10px;border-radius:10px;font:600 13px var(--body)}
   .reset{background:transparent;border:1px solid rgba(250,246,241,.25);color:rgba(250,246,241,.8);
     padding:8px 14px;border-radius:10px;font-weight:600;font-size:13px}
   .reset:hover{border-color:var(--crema);color:var(--crema)}
@@ -92,6 +94,16 @@
   .ing.low .bar .fill{background:var(--leak)}
   .bar .thr{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--espresso);opacity:.45}
   .ing .meta{display:flex;justify-content:space-between;color:var(--gray);font-size:12px;margin-top:8px}
+  .stock-actions{display:flex;gap:8px;margin-top:12px}
+  .stock-actions button{flex:1;border:1px solid var(--line);background:#faf7f2;border-radius:9px;padding:8px;
+    color:var(--espresso);font-weight:600}
+  .stock-actions button:hover{border-color:var(--crema)}
+  .ledger{margin-top:20px;background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px}
+  .ledger h3{font:700 15px var(--display);margin-bottom:10px}
+  .ledger-row{display:grid;grid-template-columns:90px 1fr auto;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);font-size:13px}
+  .ledger-row:last-child{border-bottom:0}.ledger-row time{color:var(--gray)}.ledger-row b{font-variant-numeric:tabular-nums}
+  .period{display:inline-flex;gap:8px;align-items:center;background:#fff;border:1px solid var(--line);
+    border-radius:10px;padding:8px 12px;margin-bottom:18px;color:var(--gray);font-size:13px}
 
   /* INVENTORY */
   .inv-tools{display:flex;gap:10px;margin-bottom:18px;flex-wrap:wrap}
@@ -152,6 +164,10 @@
     <button data-v="dash">Дашборд</button>
   </nav>
   <div class="spacer"></div>
+  <select class="role" id="role" aria-label="Роль">
+    <option value="owner">Владелец</option>
+    <option value="barista">Бариста</option>
+  </select>
   <button class="reset" id="reset">Сбросить демо</button>
 </div>
 
@@ -176,12 +192,14 @@
     <div class="sub">Живые остатки. Ничего не вводишь вручную — всё списывается от продаж на кассе.</div>
     <div class="alerts" id="alerts"></div>
     <div class="stock-list" id="stockList"></div>
+    <div class="ledger"><h3>Последние движения</h3><div id="ledger"></div></div>
   </section>
 
   <section class="view" id="v-inv">
     <h2 class="title">Инвентаризация</h2>
     <div class="sub">Введи, сколько реально осталось на полке. Эсеп сравнит с тем, что должно быть по продажам — и покажет утечку в сомах.</div>
-    <div class="inv-tools">
+    <div class="period" id="periodLabel"></div>
+    <div class="inv-tools owner-only">
       <button class="btn" id="fillTheory">Подставить «по системе»</button>
       <button class="btn ghost" id="simLeak">Смоделировать недостачу</button>
       <button class="btn primary" id="applyInv">Посчитать расхождение →</button>
@@ -231,6 +249,9 @@ const SEED = () => ({
     {id:'hot',  emoji:'🍫', name:'Какао',    price:140, recipe:{milk:200, cocoa:15, cup:1}},
   ],
   sales:[],
+  role:'owner',
+  periods:[{id:1,openedAt:Date.now(),closedAt:null}],
+  movements:[],
   lastInventory:null,
 });
 const KEY='esep-demo-v1';
@@ -238,16 +259,23 @@ let S = load();
 function load(){ try{const r=localStorage.getItem(KEY); if(r) return JSON.parse(r);}catch(e){} return SEED(); }
 function save(){ try{localStorage.setItem(KEY, JSON.stringify(S));}catch(e){} }
 
-if(!('lastInventory' in S)){ S.lastInventory=null; delete S.inv; save(); }
+if(!('lastInventory' in S)){ S.lastInventory=null; delete S.inv; }
+if(!S.role) S.role='owner';
+if(!Array.isArray(S.periods)||!S.periods.length) S.periods=[{id:1,openedAt:Date.now(),closedAt:null}];
+if(!Array.isArray(S.movements)) S.movements=[];
+const openPeriod = () => S.periods.findLast ? S.periods.findLast(p=>!p.closedAt) : [...S.periods].reverse().find(p=>!p.closedAt);
+S.sales.forEach(x=>{ if(!x.periodId) x.periodId=openPeriod().id; });
+save();
 
 const fmt = n => Math.round(n).toLocaleString('ru-RU');
 const ing = id => S.ingredients.find(i=>i.id===id);
 const cogsOf = p => Object.entries(p.recipe).reduce((s,[k,q])=>s+ing(k).cost*q,0);
-const dayKey = ts => { const d=new Date(ts); return `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`; };
-const todayKey = () => dayKey(Date.now());
-const salesToday = () => S.sales.filter(x=>x.ts && dayKey(x.ts)===todayKey());
-const revenue = () => salesToday().reduce((s,x)=>s+ (S.products.find(p=>p.id===x.productId)?.price||0),0);
-const cogsSold = () => salesToday().reduce((s,x)=>{const p=S.products.find(p=>p.id===x.productId);return s+(p?cogsOf(p):0)},0);
+const periodSales = (id=openPeriod().id) => S.sales.filter(x=>x.periodId===id);
+const revenue = (id=openPeriod().id) => periodSales(id).reduce((s,x)=>s+(S.products.find(p=>p.id===x.productId)?.price||0),0);
+const cogsSold = (id=openPeriod().id) => periodSales(id).reduce((s,x)=>{const p=S.products.find(p=>p.id===x.productId);return s+(p?cogsOf(p):0)},0);
+const addMovement = (ingredientId,type,qty,note='') => S.movements.push({
+  id:Date.now()+Math.random(),periodId:openPeriod().id,ingredientId,type,qty,note,ts:Date.now()
+});
 
 /* ---------- KASSA ---------- */
 function sell(p){
@@ -257,8 +285,8 @@ function sell(p){
     showToast('Продажа невозможна — не хватает на складе',detail);
     return;
   }
-  for(const [k,q] of Object.entries(p.recipe)){ ing(k).stock -= q; }
-  S.sales.push({productId:p.id, ts:Date.now()});
+  for(const [k,q] of Object.entries(p.recipe)){ ing(k).stock -= q; addMovement(k,'sale',-q,p.name); }
+  S.sales.push({productId:p.id,periodId:openPeriod().id,ts:Date.now()});
   if(S.lastInventory) S.lastInventory=null;
   save(); renderAll();
   const ded = Object.entries(p.recipe).map(([k,q])=>`−${q} ${ing(k).unit} ${ing(k).name.toLowerCase()}`).join(' · ');
@@ -283,13 +311,13 @@ function renderKassa(){
     menu.appendChild(b);
   });
   document.getElementById('rev').textContent=fmt(revenue())+' сом';
-  const todaySales=salesToday();
-  document.getElementById('cups').textContent=todaySales.length;
+  const currentSales=periodSales();
+  document.getElementById('cups').textContent=currentSales.length;
   const feed=document.getElementById('feed');
-  if(!todaySales.length){feed.innerHTML='<div class="empty">Продаж пока нет</div>';}
+  if(!currentSales.length){feed.innerHTML='<div class="empty">Продаж пока нет</div>';}
   else{
     const counts={};
-    todaySales.forEach(x=>counts[x.productId]=(counts[x.productId]||0)+1);
+    currentSales.forEach(x=>counts[x.productId]=(counts[x.productId]||0)+1);
     feed.innerHTML=Object.entries(counts).map(([id,c])=>{
       const p=S.products.find(p=>p.id===id);
       return `<div class="row"><span>${p.name}</span><span class="d num">×${c}</span></div>`;
@@ -313,13 +341,39 @@ function renderStock(){
     const el=document.createElement('div'); el.className='ing'+lowc;
     el.innerHTML=`<div class="top"><span class="nm">${i.name}</span><span class="val num">${fmt(i.stock)} ${i.unit}</span></div>
       <div class="bar"><div class="fill" style="width:${pct}%"></div><div class="thr" style="left:${thrPct}%"></div></div>
-      <div class="meta"><span>порог ${fmt(i.threshold)} ${i.unit}</span><span>себест. ${i.cost} сом/${i.unit}</span></div>`;
+      <div class="meta"><span>порог ${fmt(i.threshold)} ${i.unit}</span><span>себест. ${i.cost} сом/${i.unit}</span></div>
+      <div class="stock-actions owner-only">
+        <button data-stock="receipt" data-id="${i.id}">+ Приход</button>
+        <button data-stock="writeoff" data-id="${i.id}">− Списание</button>
+      </div>`;
     list.appendChild(el);
   });
+  document.querySelectorAll('[data-stock]').forEach(b=>b.onclick=()=>adjustStock(b.dataset.id,b.dataset.stock));
+  const ledger=document.getElementById('ledger');
+  const labels={sale:'Продажа',receipt:'Приход',writeoff:'Списание',inventory:'Инвентаризация'};
+  const rows=[...S.movements].reverse().slice(0,10);
+  ledger.innerHTML=rows.length?rows.map(m=>`<div class="ledger-row"><time>${new Date(m.ts).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'})}</time><span>${labels[m.type]} · ${ing(m.ingredientId).name}${m.note?' · '+m.note:''}</span><b>${m.qty>0?'+':''}${fmt(m.qty)} ${ing(m.ingredientId).unit}</b></div>`).join(''):'<div class="muted">Движений пока нет</div>';
+  applyRole();
+}
+function adjustStock(id,type){
+  if(S.role!=='owner') return showToast('Недостаточно прав','Приход и списание доступны владельцу.');
+  const i=ing(id); const raw=prompt(`${type==='receipt'?'Приход':'Списание'}: ${i.name}, ${i.unit}`);
+  if(raw===null) return;
+  const qty=Number(String(raw).replace(',','.'));
+  if(!Number.isFinite(qty)||qty<=0) return showToast('Количество не сохранено','Введи число больше нуля.');
+  if(type==='writeoff'&&qty>i.stock) return showToast('Списание невозможно',`На складе только ${fmt(i.stock)} ${i.unit}.`);
+  const delta=type==='receipt'?qty:-qty; i.stock+=delta; addMovement(id,type,delta);
+  save(); renderStock(); showToast(type==='receipt'?'Приход сохранён':'Списание сохранено',`${i.name}: ${delta>0?'+':''}${fmt(delta)} ${i.unit}`);
 }
 
 /* ---------- INVENTORY ---------- */
 function renderInv(){
+  if(S.role!=='owner'){
+    document.getElementById('invTable').innerHTML='<tbody><tr><td>Инвентаризацию может проводить только владелец.</td></tr></tbody>';
+    document.getElementById('periodLabel').textContent=`Смена №${openPeriod().id}`;
+    return;
+  }
+  document.getElementById('periodLabel').textContent=`Смена №${openPeriod().id} · открыта ${new Date(openPeriod().openedAt).toLocaleString('ru-RU')}`;
   const t=document.getElementById('invTable');
   const rows=S.ingredients.map(i=>{
     return `<tr data-id="${i.id}">
@@ -367,8 +421,11 @@ function applyInv(){
     return;
   }
   const total=items.reduce((sum,item)=>sum+item.leak,0);
-  S.lastInventory={closedAt:Date.now(),items,total};
-  items.forEach(item=>{ ing(item.id).stock=item.actual; });
+  const period=openPeriod(); const closedAt=Date.now();
+  S.lastInventory={periodId:period.id,closedAt,items,total};
+  items.forEach(item=>{ const delta=item.actual-item.theoretical; ing(item.id).stock=item.actual; if(delta) addMovement(item.id,'inventory',delta); });
+  period.closedAt=closedAt;
+  S.periods.push({id:Math.max(...S.periods.map(p=>p.id))+1,openedAt:closedAt,closedAt:null});
   save(); renderDash(); switchView('dash');
 }
 function fillTheory(){ document.querySelectorAll('#invTable tbody tr').forEach(tr=>{tr.querySelector('input').value=Math.round(ing(tr.dataset.id).stock);}); recalcInv(); }
@@ -383,11 +440,12 @@ function simLeak(){
 
 /* ---------- DASHBOARD ---------- */
 function renderDash(){
-  const rev=revenue(), cogs=cogsSold(), fc=rev?Math.round(cogs/rev*100):0;
+  const reportPeriod=S.lastInventory?.periodId||openPeriod().id;
+  const rev=revenue(reportPeriod), cogs=cogsSold(reportPeriod), fc=rev?Math.round(cogs/rev*100):0;
   document.getElementById('dRev').textContent=fmt(rev);
   document.getElementById('dCogs').textContent=fmt(cogs);
   document.getElementById('dFc').textContent=fc+'%';
-  document.getElementById('dCups').textContent=salesToday().length;
+  document.getElementById('dCups').textContent=periodSales(reportPeriod).length;
   const big=document.getElementById('leakBig'), exp=document.getElementById('leakExp');
   const bl=document.getElementById('breakList');
   if(!S.lastInventory){
@@ -414,19 +472,26 @@ function renderDash(){
 
 /* ---------- shell ---------- */
 function switchView(v){
+  if(S.role==='barista'&&(v==='inv'||v==='dash')){ showToast('Раздел владельца','Бариста работает с кассой и видит остатки.'); v='kassa'; }
   document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
   document.querySelectorAll('.view').forEach(s=>s.classList.toggle('on', s.id==='v-'+v));
   if(v==='inv') renderInv(); if(v==='dash') renderDash(); if(v==='stock') renderStock(); if(v==='kassa') renderKassa();
 }
 function renderAll(){ renderKassa(); renderStock(); if(document.getElementById('v-inv').classList.contains('on')) renderInv(); if(document.getElementById('v-dash').classList.contains('on')) renderDash(); }
+function applyRole(){
+  document.getElementById('role').value=S.role;
+  document.querySelectorAll('.owner-only').forEach(el=>el.style.display=S.role==='owner'?'':'none');
+  document.querySelectorAll('.tabs button').forEach(b=>{ if(b.dataset.v==='inv'||b.dataset.v==='dash') b.style.display=S.role==='owner'?'':'none'; });
+}
 
 document.getElementById('tabs').addEventListener('click',e=>{const b=e.target.closest('button'); if(b) switchView(b.dataset.v);});
 document.getElementById('reset').onclick=()=>{ if(confirm('Сбросить демо к начальным данным?')){ S=SEED(); save(); switchView('kassa'); renderAll(); } };
 document.getElementById('applyInv').onclick=applyInv;
 document.getElementById('fillTheory').onclick=fillTheory;
 document.getElementById('simLeak').onclick=simLeak;
+document.getElementById('role').onchange=e=>{S.role=e.target.value;save();applyRole();switchView(S.role==='barista'?'kassa':'stock');renderAll();};
 
-renderAll();
+applyRole(); renderAll();
 </script>
 </body>
 </html>
