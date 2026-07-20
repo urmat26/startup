@@ -28,6 +28,7 @@
   .tabs{display:flex;gap:4px;margin-left:8px}
   .tabs button{background:transparent;border:none;color:rgba(250,246,241,.62);padding:9px 16px;border-radius:10px;
     font-weight:600;font-size:15px;transition:.15s}
+  .tabs .short{display:none}
   .tabs button:hover{color:var(--cream);background:rgba(255,255,255,.06)}
   .tabs button.on{background:var(--crema);color:var(--espresso)}
   .tabs button:focus-visible{outline:2px solid var(--crema);outline-offset:2px}
@@ -167,7 +168,8 @@
     .grid{grid-template-columns:1fr 1fr;gap:10px}
     .tile{padding:14px}.tile .pname{font-size:16px}.tile .rc{display:none}
     .cart{padding:18px}.cart .rev{font-size:34px}
-    .stock-actions{flex-direction:column}
+    .tabs button{min-width:82px}
+    .tabs .full{display:none}.tabs .short{display:inline}
     .inv-tools{display:grid;grid-template-columns:1fr}
     .inv-tools .btn{width:100%}
     .stat-row{grid-template-columns:1fr 1fr;gap:10px}
@@ -182,10 +184,10 @@
 <div class="topbar">
   <div class="brand">эсеп<span class="dot"></span><small>кофейня «Каймак»</small></div>
   <nav class="tabs" id="tabs">
-    <button data-v="kassa" class="on">Касса</button>
-    <button data-v="stock">Склад</button>
-    <button data-v="inv">Инвентаризация</button>
-    <button data-v="dash">Дашборд</button>
+    <button data-v="kassa" class="on"><span class="full">Касса</span><span class="short">Касса</span></button>
+    <button data-v="stock"><span class="full">Склад</span><span class="short">Склад</span></button>
+    <button data-v="inv"><span class="full">Инвентаризация</span><span class="short">Инвент.</span></button>
+    <button data-v="dash"><span class="full">Дашборд</span><span class="short">Итоги</span></button>
   </nav>
   <div class="spacer"></div>
   <select class="role" id="role" aria-label="Роль">
@@ -266,7 +268,7 @@ const SEED = () => ({
   ],
   products:[
     {id:'esp',  emoji:'☕', name:'Эспрессо', price:90,  recipe:{beans:18, cup:1}},
-    {id:'amer', emoji:'🫗', name:'Американо', price:110, recipe:{beans:18, cup:1}},
+    {id:'amer', emoji:'☕', name:'Американо', price:110, recipe:{beans:18, cup:1}},
     {id:'latte',emoji:'🥛', name:'Латте',    price:160, recipe:{beans:18, milk:200, cup:1}},
     {id:'capp', emoji:'☕', name:'Капучино', price:150, recipe:{beans:18, milk:150, cup:1}},
     {id:'raf',  emoji:'🍮', name:'Раф',      price:190, recipe:{beans:18, milk:150, syrup:20, cup:1}},
@@ -503,6 +505,7 @@ function switchView(v){
   document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
   document.querySelectorAll('.view').forEach(s=>s.classList.toggle('on', s.id==='v-'+v));
   if(v==='inv') renderInv(); if(v==='dash') renderDash(); if(v==='stock') renderStock(); if(v==='kassa') renderKassa();
+  window.scrollTo({top:0,behavior:'auto'});
 }
 function renderAll(){ renderKassa(); renderStock(); if(document.getElementById('v-inv').classList.contains('on')) renderInv(); if(document.getElementById('v-dash').classList.contains('on')) renderDash(); }
 function applyRole(){
