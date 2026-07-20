@@ -308,6 +308,14 @@ document.getElementById('applyInv').onclick=applyInv;
 document.getElementById('fillTheory').onclick=fillTheory;
 document.getElementById('simLeak').onclick=simLeak;
 document.getElementById('undoSale').onclick=cancelLastSale;
-document.getElementById('role').onchange=e=>{S.role=e.target.value;save();applyRole();switchView(S.role==='barista'?'kassa':'stock');renderAll();};
+document.getElementById('role').onchange=e=>{
+  const current=document.querySelector('.view.on')?.id.replace('v-','')||'kassa';
+  S.role=e.target.value;
+  save();
+  applyRole();
+  const protectedView=current==='inv'||current==='dash';
+  switchView(S.role==='barista'&&protectedView?'kassa':current);
+  renderAll();
+};
 
 applyRole(); renderAll();
