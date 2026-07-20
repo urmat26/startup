@@ -26,6 +26,7 @@ const SEED = () => ({
   role:'owner',
   periods:[{id:1,openedAt:Date.now(),closedAt:null}],
   movements:[],
+  inventories:[],
   lastInventory:null,
 });
 const KEY='esep-demo-v1';
@@ -37,6 +38,7 @@ if(!('lastInventory' in S)){ S.lastInventory=null; delete S.inv; }
 if(!S.role) S.role='owner';
 if(!Array.isArray(S.periods)||!S.periods.length) S.periods=[{id:1,openedAt:Date.now(),closedAt:null}];
 if(!Array.isArray(S.movements)) S.movements=[];
+if(!Array.isArray(S.inventories)) S.inventories=S.lastInventory?[S.lastInventory]:[];
 const openPeriod = () => S.periods.findLast ? S.periods.findLast(p=>!p.closedAt) : [...S.periods].reverse().find(p=>!p.closedAt);
 S.sales.forEach(x=>{ if(!x.periodId) x.periodId=openPeriod().id; });
 save();
@@ -65,6 +67,19 @@ function sell(p){
   save(); renderAll();
   const ded = Object.entries(p.recipe).map(([k,q])=>`−${q} ${ing(k).unit} ${ing(k).name.toLowerCase()}`).join(' · ');
   showToast(`${p.name} · ${p.price} сом`, ded);
+}
+function cancelLastSale(){
+  const sale=[...S.sales].reverse().find(x=>x.periodId===openPeriod().id&&!x.canceledAt);
+  if(!sale) return showToast('Отменять нечего','В текущей смене нет активных продаж.');
+  const product=S.products.find(p=>p.id===sale.productId);
+  if(!product) return showToast('Продажа не отменена','Товар больше не найден в меню.');
+  sale.canceledAt=Date.now();
+  for(const [ingredientId,quantity] of Object.entries(product.recipe)){
+    ing(ingredientId).stock+=quantity;
+    addMovement(ingredientId,'refund',quantity,product.name);
+  }
+  save(); renderAll();
+  showToast('Продажа отменена',`${product.name} · ингредиенты возвращены на склад`);
 }
 let toastTimer;
 function showToast(t1,t2){
@@ -100,6 +115,7 @@ function renderKassa(){
       return `<div class="row"><span>${p.name}</span><span class="d num">×${c}</span></div>`;
     }).join('');
   }
+  document.getElementById('undoSale').disabled=!currentSales.length;
 }
 
 /* ---------- STOCK ---------- */
@@ -128,6 +144,7 @@ function renderStock(){
   document.querySelectorAll('[data-stock]').forEach(b=>b.onclick=()=>adjustStock(b.dataset.id,b.dataset.stock));
   const ledger=document.getElementById('ledger');
   const labels={sale:'Продажа',receipt:'Приход',writeoff:'Списание',inventory:'Инвентаризация'};
+  labels.refund='Отмена продажи';
   const rows=[...S.movements].reverse().slice(0,10);
   ledger.innerHTML=rows.length?rows.map(m=>`<div class="ledger-row"><time>${new Date(m.ts).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'})}</time><span>${labels[m.type]} · ${ing(m.ingredientId).name}${m.note?' · '+m.note:''}</span><b>${m.qty>0?'+':''}${fmt(m.qty)} ${ing(m.ingredientId).unit}</b></div>`).join(''):'<div class="muted">Движений пока нет</div>';
   applyRole();
@@ -203,6 +220,7 @@ function applyInv(){
   const total=items.reduce((sum,item)=>sum+item.leak,0);
   const period=openPeriod(); const closedAt=Date.now();
   S.lastInventory={periodId:period.id,closedAt,items,total};
+  S.inventories.push(S.lastInventory);
   items.forEach(item=>{ const delta=item.actual-item.theoretical; ing(item.id).stock=item.actual; if(delta) addMovement(item.id,'inventory',delta); });
   period.closedAt=closedAt;
   S.periods.push({id:Math.max(...S.periods.map(p=>p.id))+1,openedAt:closedAt,closedAt:null});
@@ -228,6 +246,7 @@ function renderDash(){
   document.getElementById('dCups').textContent=periodSales(reportPeriod).length;
   const big=document.getElementById('leakBig'), exp=document.getElementById('leakExp');
   const bl=document.getElementById('breakList');
+  renderPeriodHistory();
   if(!S.lastInventory){
     big.textContent='—'; big.className='big ok';
     exp.innerHTML='Сделай <b>инвентаризацию</b> — и Эсеп покажет, сколько денег утекло помимо проданных чашек.';
@@ -248,6 +267,24 @@ function renderDash(){
   bl.innerHTML=items.filter(x=>x.leak>0).sort((a,b)=>b.leak-a.leak).map(x=>
     `<div class="brow"><span class="bn">${x.name}</span><div class="bbar"><span style="width:${x.leak/max*100}%"></span></div>
      <span class="bv">−${fmt(x.leak)} сом</span></div>`).join('') || '<div class="muted" style="font-size:14px">Утечки нет — всё сходится ✅</div>';
+}
+function renderPeriodHistory(){
+  const root=document.getElementById('periodHistory');
+  const closed=[...S.periods].filter(p=>p.closedAt).reverse();
+  if(!closed.length){
+    root.innerHTML='<div class="muted" style="font-size:14px">Закрытых смен пока нет.</div>';
+    return;
+  }
+  root.innerHTML=closed.map(period=>{
+    const inv=S.inventories.find(x=>x.periodId===period.id);
+    const cups=periodSales(period.id).length;
+    return `<div class="history-row">
+      <div class="shift">Смена №${period.id}<span class="when">${new Date(period.closedAt).toLocaleString('ru-RU')}</span></div>
+      <div class="metric">${fmt(revenue(period.id))} сом<span>выручка</span></div>
+      <div class="metric">${cups}<span>чашек</span></div>
+      <div class="metric">${fmt(inv?.total||0)} сом<span>утечка</span></div>
+    </div>`;
+  }).join('');
 }
 
 /* ---------- shell ---------- */
@@ -270,6 +307,7 @@ document.getElementById('reset').onclick=()=>{ if(confirm('Сбросить де
 document.getElementById('applyInv').onclick=applyInv;
 document.getElementById('fillTheory').onclick=fillTheory;
 document.getElementById('simLeak').onclick=simLeak;
+document.getElementById('undoSale').onclick=cancelLastSale;
 document.getElementById('role').onchange=e=>{S.role=e.target.value;save();applyRole();switchView(S.role==='barista'?'kassa':'stock');renderAll();};
 
 applyRole(); renderAll();

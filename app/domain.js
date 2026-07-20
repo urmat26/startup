@@ -1,5 +1,5 @@
 export function salesForPeriod(sales, periodId) {
-  return sales.filter((sale) => sale.periodId === periodId);
+  return sales.filter((sale) => sale.periodId === periodId && !sale.canceledAt);
 }
 
 export function calculateRevenue(sales, products, periodId) {

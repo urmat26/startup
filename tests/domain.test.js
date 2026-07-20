@@ -27,6 +27,16 @@ test('period metrics include only sales from the selected shift', () => {
   assert.equal(calculateCogs(sales, products, ingredients, 1), 31);
 });
 
+test('canceled sales are excluded from shift metrics', () => {
+  const canceled = [
+    ...sales,
+    { productId: 'esp', periodId: 1, canceledAt: Date.now() },
+  ];
+  assert.equal(salesForPeriod(canceled, 1).length, 1);
+  assert.equal(calculateRevenue(canceled, products, 1), 90);
+  assert.equal(calculateCogs(canceled, products, ingredients, 1), 31);
+});
+
 test('sale is blocked when any recipe ingredient is missing', () => {
   const missing = findMissingIngredients(products[0], [
     { ...ingredients[0], stock: 17 },

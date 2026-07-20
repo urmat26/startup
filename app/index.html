@@ -36,6 +36,7 @@
         <div class="revl">выручка за смену</div>
         <div class="cups">Продано чашек: <b id="cups">0</b></div>
         <div class="feed" id="feed"><div class="empty">Продаж пока нет</div></div>
+        <button class="undo-sale" id="undoSale" disabled>Отменить последнюю продажу</button>
       </aside>
     </div>
   </section>
@@ -78,6 +79,10 @@
     <div class="break">
       <h4>Где утекло</h4>
       <div id="breakList"><div class="muted" style="font-size:14px">Сделай инвентаризацию, чтобы увидеть разбивку утечки по продуктам.</div></div>
+    </div>
+    <div class="history">
+      <h4>История смен</h4>
+      <div id="periodHistory"></div>
     </div>
   </section>
 </div>
