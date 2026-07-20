@@ -108,6 +108,7 @@
   table.inv input{width:92px;text-align:right;padding:8px 10px;border:1px solid var(--line);border-radius:8px;
     font-family:var(--display);font-weight:700;font-variant-numeric:tabular-nums;font-size:15px;color:var(--espresso);background:#fff}
   table.inv input:focus{outline:2px solid var(--crema);border-color:var(--crema)}
+  table.inv input.invalid{border-color:var(--leak);outline:2px solid rgba(214,69,69,.2)}
   .var-ok{color:var(--money);font-weight:700} .var-leak{color:var(--leak);font-weight:700}
   tfoot td{font-family:var(--display);font-weight:800;font-size:16px;background:#faf7f2;border-top:2px solid var(--line)}
 
@@ -241,8 +242,14 @@ function save(){ try{localStorage.setItem(KEY, JSON.stringify(S));}catch(e){} }
 const fmt = n => Math.round(n).toLocaleString('ru-RU');
 const ing = id => S.ingredients.find(i=>i.id===id);
 const cogsOf = p => Object.entries(p.recipe).reduce((s,[k,q])=>s+ing(k).cost*q,0);
-const revenue = () => S.sales.reduce((s,x)=>s+ (S.products.find(p=>p.id===x.productId)?.price||0),0);
-const cogsSold = () => S.sales.reduce((s,x)=>{const p=S.products.find(p=>p.id===x.productId);return s+(p?cogsOf(p):0)},0);
+const todaySales = () => {
+  const now=new Date();
+  const start=new Date(now.getFullYear(),now.getMonth(),now.getDate()).getTime();
+  const end=new Date(now.getFullYear(),now.getMonth(),now.getDate()+1).getTime();
+  return S.sales.filter(x=>x.ts>=start&&x.ts<end);
+};
+const revenue = sales => sales.reduce((s,x)=>s+(S.products.find(p=>p.id===x.productId)?.price||0),0);
+const cogsSold = sales => sales.reduce((s,x)=>{const p=S.products.find(p=>p.id===x.productId);return s+(p?cogsOf(p):0)},0);
 
 /* ---------- KASSA ---------- */
 function sell(p){
@@ -269,6 +276,7 @@ function showToast(t1,t2){
   clearTimeout(toastTimer); toastTimer=setTimeout(()=>el.classList.remove('show'),2200);
 }
 function renderKassa(){
+  const sales=todaySales();
   const menu=document.getElementById('menu');
   menu.innerHTML='';
   S.products.forEach(p=>{
@@ -279,13 +287,13 @@ function renderKassa(){
     b.onclick=()=>sell(p);
     menu.appendChild(b);
   });
-  document.getElementById('rev').textContent=fmt(revenue())+' сом';
-  document.getElementById('cups').textContent=S.sales.length;
+  document.getElementById('rev').textContent=fmt(revenue(sales))+' сом';
+  document.getElementById('cups').textContent=sales.length;
   const feed=document.getElementById('feed');
-  if(!S.sales.length){feed.innerHTML='<div class="empty">Продаж пока нет</div>';}
+  if(!sales.length){feed.innerHTML='<div class="empty">Продаж сегодня пока нет</div>';}
   else{
     const counts={};
-    S.sales.forEach(x=>counts[x.productId]=(counts[x.productId]||0)+1);
+    sales.forEach(x=>counts[x.productId]=(counts[x.productId]||0)+1);
     feed.innerHTML=Object.entries(counts).map(([id,c])=>{
       const p=S.products.find(p=>p.id===id);
       return `<div class="row"><span>${p.name}</span><span class="d num">×${c}</span></div>`;
@@ -331,7 +339,7 @@ function renderInv(){
     return `<tr data-id="${i.id}">
       <td class="nm">${i.name}</td>
       <td class="num">${fmt(stock)} ${i.unit}</td>
-      <td><input type="number" inputmode="numeric" value="${actual}" placeholder="—"> <span class="muted">${i.unit}</span></td>
+      <td><input type="number" inputmode="decimal" min="0" value="${actual}" placeholder="—"> <span class="muted">${i.unit}</span></td>
       <td class="varcell num">—</td>
       <td class="leakcell num">—</td>
     </tr>`;
@@ -343,12 +351,19 @@ function renderInv(){
   recalcInv();
 }
 function recalcInv(){
-  let total=0;
+  let total=0, complete=true;
   document.querySelectorAll('#invTable tbody tr').forEach(tr=>{
     const i=ing(tr.dataset.id); const inp=tr.querySelector('input');
     const varcell=tr.querySelector('.varcell'); const leakcell=tr.querySelector('.leakcell');
-    if(inp.value===''){varcell.textContent='—';varcell.className='varcell num';leakcell.textContent='—';leakcell.className='leakcell num';return;}
-    const actual=parseFloat(inp.value)||0; const diff=S.inv.snapshot[i.id]-actual; // >0 = утекло
+    const actual=Number(inp.value);
+    if(inp.value.trim()===''||!Number.isFinite(actual)||actual<0){
+      complete=false;
+      inp.classList.toggle('invalid',inp.value.trim()!=='');
+      varcell.textContent='Не проверено';varcell.className='varcell num var-leak';
+      leakcell.textContent='—';leakcell.className='leakcell num';return;
+    }
+    inp.classList.remove('invalid');
+    const diff=S.inv.snapshot[i.id]-actual; // >0 = утекло
     const leak=Math.max(0,diff)*i.cost;
     varcell.textContent=(diff>0?'−':diff<0?'+':'')+fmt(Math.abs(diff))+' '+i.unit;
     varcell.className='varcell num '+(diff>0?'var-leak':'var-ok');
@@ -357,15 +372,29 @@ function recalcInv(){
     total+=leak;
   });
   const tot=document.getElementById('invTotal');
-  if(tot){tot.textContent=fmt(total)+' сом'; tot.className='num '+(total>0?'var-leak':'var-ok');}
+  if(tot){tot.textContent=complete?fmt(total)+' сом':'Не проверено'; tot.className='num '+(complete&&total===0?'var-ok':'var-leak');}
 }
 function applyInv(){
-  S.inv.actual={};
-  document.querySelectorAll('#invTable tbody tr').forEach(tr=>{
-    const inp=tr.querySelector('input'); if(inp.value!=='') S.inv.actual[tr.dataset.id]=parseFloat(inp.value)||0;
+  const rows=[...document.querySelectorAll('#invTable tbody tr')];
+  const actual={};
+  let firstInvalid=null;
+  rows.forEach(tr=>{
+    const inp=tr.querySelector('input');
+    const value=Number(inp.value);
+    const invalid=inp.value.trim()===''||!Number.isFinite(value)||value<0;
+    inp.classList.toggle('invalid',invalid);
+    if(invalid){firstInvalid??=inp; return;}
+    actual[tr.dataset.id]=value;
   });
+  if(firstInvalid){
+    recalcInv(); firstInvalid.focus();
+    showToast('Инвентаризация не сохранена','Введи фактический остаток по каждой позиции');
+    return;
+  }
+  S.inv.actual=actual;
   S.inv.completed=true;
-  save(); renderDash(); switchView('dash');
+  S.ingredients.forEach(i=>{i.stock=actual[i.id];});
+  save(); renderStock(); switchView('dash');
 }
 function fillTheory(){ document.querySelectorAll('#invTable tbody tr').forEach(tr=>{tr.querySelector('input').value=Math.round(S.inv.snapshot[tr.dataset.id]);}); recalcInv(); }
 function simLeak(){
@@ -379,14 +408,16 @@ function simLeak(){
 
 /* ---------- DASHBOARD ---------- */
 function renderDash(){
-  const rev=revenue(), cogs=cogsSold(), fc=rev?Math.round(cogs/rev*100):0;
+  const sales=todaySales();
+  const rev=revenue(sales), cogs=cogsSold(sales), fc=rev?Math.round(cogs/rev*100):0;
   document.getElementById('dRev').textContent=fmt(rev);
   document.getElementById('dCogs').textContent=fmt(cogs);
   document.getElementById('dFc').textContent=fc+'%';
-  document.getElementById('dCups').textContent=S.sales.length;
+  document.getElementById('dCups').textContent=sales.length;
   const big=document.getElementById('leakBig'), exp=document.getElementById('leakExp');
   const bl=document.getElementById('breakList');
-  if(!S.inv || !S.inv.completed){
+  const inventoryComplete=S.inv?.completed&&S.ingredients.every(i=>Number.isFinite(S.inv.actual?.[i.id])&&S.inv.actual[i.id]>=0);
+  if(!inventoryComplete){
     big.textContent='—'; big.className='big ok';
     exp.innerHTML='Сделай <b>инвентаризацию</b> — и Эсеп покажет, сколько денег утекло помимо проданных чашек.';
     bl.innerHTML='<div class="muted" style="font-size:14px">Сделай инвентаризацию, чтобы увидеть разбивку утечки по продуктам.</div>';
@@ -394,7 +425,7 @@ function renderDash(){
   }
   const items=S.ingredients.map(i=>{
     const stock=S.inv.snapshot[i.id];
-    const actual=S.inv.actual[i.id]??stock;
+    const actual=S.inv.actual[i.id];
     const diff=Math.max(0,stock-actual); return {i, leak:diff*i.cost, diff};
   });
   const total=items.reduce((s,x)=>s+x.leak,0);
