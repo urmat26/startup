@@ -16,7 +16,8 @@
   html,body{height:100%}
   body{font-family:var(--body);background:var(--cream);color:var(--espresso);-webkit-font-smoothing:antialiased}
   .num{font-variant-numeric:tabular-nums;font-family:var(--display)}
-  button{font-family:inherit;cursor:pointer}
+  button{font-family:inherit;cursor:pointer;min-height:44px}
+  button:disabled{cursor:not-allowed;opacity:.48}
 
   /* top bar */
   .topbar{display:flex;align-items:center;gap:20px;background:var(--espresso);color:var(--cream);
@@ -50,6 +51,7 @@
     transition:.12s;position:relative;overflow:hidden}
   .tile:hover{transform:translateY(-2px);box-shadow:0 8px 22px rgba(36,26,21,.09);border-color:var(--crema)}
   .tile:active{transform:translateY(0) scale(.98)}
+  .tile:disabled:hover{transform:none;box-shadow:none;border-color:var(--line)}
   .tile:focus-visible{outline:3px solid var(--crema-deep);outline-offset:2px}
   .tile .emoji{font-size:26px}
   .tile .pname{font-family:var(--display);font-weight:800;font-size:19px;margin-top:8px}
@@ -145,11 +147,33 @@
   .brow .bv{flex:none;width:110px;text-align:right;font-variant-numeric:tabular-nums;font-weight:700}
   .muted{color:var(--gray)}
   .hint{color:var(--gray);font-size:13px;margin-top:14px}
+  .table-scroll{max-width:100%;overflow-x:auto;border-radius:14px}
 
   @media (max-width:860px){
+    .topbar{flex-wrap:wrap;gap:10px;padding:11px 16px}
+    .tabs{order:3;width:100%;margin-left:0;overflow-x:auto;scrollbar-width:none}
+    .tabs::-webkit-scrollbar{display:none}
+    .tabs button{flex:1;min-width:max-content;padding:9px 12px}
     .kassa{grid-template-columns:1fr} .grid{grid-template-columns:repeat(2,1fr)}
     .stat-row{grid-template-columns:repeat(2,1fr)} .stock-list{grid-template-columns:1fr}
     .cart{position:static}
+    .wrap{padding:22px 16px 48px}
+    table.inv{min-width:720px}
+    .ledger-row{grid-template-columns:72px 1fr auto}
+  }
+  @media (max-width:520px){
+    .brand{font-size:23px}.brand small{display:none}.spacer{display:none}
+    .role{margin-left:auto;max-width:118px}.reset{padding:8px 10px}
+    .grid{grid-template-columns:1fr 1fr;gap:10px}
+    .tile{padding:14px}.tile .pname{font-size:16px}.tile .rc{display:none}
+    .cart{padding:18px}.cart .rev{font-size:34px}
+    .stock-actions{flex-direction:column}
+    .inv-tools{display:grid;grid-template-columns:1fr}
+    .inv-tools .btn{width:100%}
+    .stat-row{grid-template-columns:1fr 1fr;gap:10px}
+    .stat{padding:14px}.stat .k{font-size:23px}
+    .hero{padding:24px 20px}.brow .bn{width:86px}.brow .bv{width:88px}
+    .ledger-row{grid-template-columns:1fr auto}.ledger-row time{grid-column:1/-1}
   }
   @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
@@ -178,7 +202,7 @@
     <div class="kassa">
       <div class="grid" id="menu"></div>
       <aside class="cart">
-        <h3>Сегодня</h3>
+        <h3>Текущая смена</h3>
         <div class="rev num" id="rev">0 сом</div>
         <div class="revl">выручка за смену</div>
         <div class="cups">Продано чашек: <b id="cups">0</b></div>
@@ -189,7 +213,7 @@
 
   <section class="view" id="v-stock">
     <h2 class="title">Склад</h2>
-    <div class="sub">Живые остатки. Ничего не вводишь вручную — всё списывается от продаж на кассе.</div>
+    <div class="sub">Продажи списывают ингредиенты автоматически. Владелец также фиксирует приход и ручные списания.</div>
     <div class="alerts" id="alerts"></div>
     <div class="stock-list" id="stockList"></div>
     <div class="ledger"><h3>Последние движения</h3><div id="ledger"></div></div>
@@ -204,7 +228,7 @@
       <button class="btn ghost" id="simLeak">Смоделировать недостачу</button>
       <button class="btn primary" id="applyInv">Посчитать расхождение →</button>
     </div>
-    <table class="inv" id="invTable"></table>
+    <div class="table-scroll"><table class="inv" id="invTable"></table></div>
     <div class="hint">«По системе» — сколько должно остаться по продажам. «Факт» — что ты реально насчитал. Разница = утечка (пролив, недолив, воровство, порча).</div>
   </section>
 
@@ -229,7 +253,7 @@
   </section>
 </div>
 
-<div class="toast" id="toast"><div class="t1" id="toastT1"></div><div class="t2" id="toastT2"></div></div>
+<div class="toast" id="toast" role="status" aria-live="polite"><div class="t1" id="toastT1"></div><div class="t2" id="toastT2"></div></div>
 
 <script>
 const SEED = () => ({
@@ -304,9 +328,12 @@ function renderKassa(){
   menu.innerHTML='';
   S.products.forEach(p=>{
     const b=document.createElement('button'); b.className='tile';
+    const missing=Object.entries(p.recipe).filter(([k,q])=>ing(k).stock<q).map(([k])=>ing(k).name);
+    b.disabled=missing.length>0;
+    b.setAttribute('aria-label',missing.length?`${p.name}, недоступно: не хватает ${missing.join(', ')}`:`Продать ${p.name} за ${p.price} сом`);
     const rc=Object.entries(p.recipe).map(([k,q])=>`${q}${ing(k).unit} ${ing(k).name.toLowerCase()}`).join(', ');
     b.innerHTML=`<div class="emoji">${p.emoji}</div><div class="pname">${p.name}</div>
-      <div class="price num">${p.price} сом</div><div class="rc">${rc}</div>`;
+      <div class="price num">${p.price} сом</div><div class="rc">${missing.length?'Нет на складе: '+missing.join(', '):rc}</div>`;
     b.onclick=()=>sell(p);
     menu.appendChild(b);
   });
