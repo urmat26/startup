@@ -1,13 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import {
+await import('../app/domain.js');
+
+const {
   calculateCogs,
   calculateInventory,
   calculateRevenue,
   findMissingIngredients,
   salesForPeriod,
-} from '../app/domain.js';
+} = globalThis.EsepDomain;
 
 const ingredients = [
   { id: 'beans', name: 'Зёрна', stock: 20, cost: 1.5 },

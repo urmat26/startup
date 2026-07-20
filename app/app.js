@@ -1,10 +1,10 @@
-import {
+const {
   calculateCogs,
   calculateInventory,
   calculateRevenue,
   findMissingIngredients,
   salesForPeriod,
-} from './domain.js';
+} = globalThis.EsepDomain;
 
 const SEED = () => ({
   ingredients:[

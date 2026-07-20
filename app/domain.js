@@ -1,14 +1,15 @@
-export function salesForPeriod(sales, periodId) {
+(function initializeDomain(global) {
+function salesForPeriod(sales, periodId) {
   return sales.filter((sale) => sale.periodId === periodId && !sale.canceledAt);
 }
 
-export function calculateRevenue(sales, products, periodId) {
+function calculateRevenue(sales, products, periodId) {
   const prices = new Map(products.map((product) => [product.id, product.price]));
   return salesForPeriod(sales, periodId)
     .reduce((total, sale) => total + (prices.get(sale.productId) ?? 0), 0);
 }
 
-export function calculateCogs(sales, products, ingredients, periodId) {
+function calculateCogs(sales, products, ingredients, periodId) {
   const costs = new Map(ingredients.map((ingredient) => [ingredient.id, ingredient.cost]));
   const productCosts = new Map(products.map((product) => [
     product.id,
@@ -22,7 +23,7 @@ export function calculateCogs(sales, products, ingredients, periodId) {
     .reduce((total, sale) => total + (productCosts.get(sale.productId) ?? 0), 0);
 }
 
-export function findMissingIngredients(product, ingredients) {
+function findMissingIngredients(product, ingredients) {
   const stock = new Map(ingredients.map((ingredient) => [ingredient.id, ingredient]));
 
   return Object.entries(product.recipe).flatMap(([ingredientId, quantity]) => {
@@ -32,7 +33,7 @@ export function findMissingIngredients(product, ingredients) {
   });
 }
 
-export function calculateInventory(ingredients, actualById) {
+function calculateInventory(ingredients, actualById) {
   return ingredients.map((ingredient) => {
     const actual = actualById[ingredient.id];
     if (!Number.isFinite(actual) || actual < 0) {
@@ -48,3 +49,12 @@ export function calculateInventory(ingredients, actualById) {
     };
   });
 }
+
+global.EsepDomain = {
+  calculateCogs,
+  calculateInventory,
+  calculateRevenue,
+  findMissingIngredients,
+  salesForPeriod,
+};
+}(globalThis));
