@@ -54,9 +54,11 @@
     <div class="sub">Введи, сколько реально осталось на полке. Эсеп сравнит с тем, что должно быть по продажам — и покажет утечку в сомах.</div>
     <div class="period" id="periodLabel"></div>
     <div class="inv-tools owner-only">
+      <button class="btn primary" id="startInv">Начать пересчёт</button>
       <button class="btn" id="fillTheory">Подставить «по системе»</button>
       <button class="btn ghost" id="simLeak">Смоделировать недостачу</button>
-      <button class="btn primary" id="applyInv">Посчитать расхождение →</button>
+      <button class="btn primary" id="applyInv">Закрыть смену →</button>
+      <button class="btn ghost" id="cancelInv">Отменить пересчёт</button>
     </div>
     <div class="table-scroll"><table class="inv" id="invTable"></table></div>
     <div class="hint">«По системе» — сколько должно остаться по продажам. «Факт» — что ты реально насчитал. Разница = утечка (пролив, недолив, воровство, порча).</div>
