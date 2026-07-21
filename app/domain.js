@@ -37,6 +37,34 @@ function createInventorySnapshot(ingredients) {
   return Object.fromEntries(ingredients.map((ingredient) => [ingredient.id, ingredient.stock]));
 }
 
+function calculateIngredientUsage(sales, products, periodId) {
+  const productById = new Map(products.map((product) => [product.id, product]));
+  const usage = {};
+  salesForPeriod(sales, periodId).forEach((sale) => {
+    const product = productById.get(sale.productId);
+    if (!product) return;
+    Object.entries(product.recipe).forEach(([ingredientId, quantity]) => {
+      usage[ingredientId] = (usage[ingredientId] ?? 0) + quantity;
+    });
+  });
+  return usage;
+}
+
+function simulateActualStock(ingredients, theoreticalById, usageById) {
+  return Object.fromEntries(ingredients.map((ingredient) => {
+    const theoretical = theoreticalById[ingredient.id];
+    const usage = Math.max(0, usageById[ingredient.id] ?? 0);
+    if (!Number.isFinite(theoretical) || theoretical < 0) {
+      throw new TypeError(`Invalid theoretical stock for ${ingredient.id}`);
+    }
+    const baseError = usage > 0 ? ingredient.unit === 'мл' ? 5 : ingredient.unit === 'г' ? 1 : 0 : 0;
+    const shortage = ingredient.unit === 'шт'
+      ? Math.round(usage * 0.075)
+      : Math.round(usage * 0.075 + baseError);
+    return [ingredient.id, Math.max(0, theoretical - shortage)];
+  }));
+}
+
 function calculateInventory(ingredients, actualById, theoreticalById = createInventorySnapshot(ingredients)) {
   return ingredients.map((ingredient) => {
     const actual = actualById[ingredient.id];
@@ -60,10 +88,12 @@ function calculateInventory(ingredients, actualById, theoreticalById = createInv
 
 global.EsepDomain = {
   calculateCogs,
+  calculateIngredientUsage,
   calculateInventory,
   calculateRevenue,
   createInventorySnapshot,
   findMissingIngredients,
   salesForPeriod,
+  simulateActualStock,
 };
 }(globalThis));

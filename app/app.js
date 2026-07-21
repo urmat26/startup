@@ -1,10 +1,12 @@
 const {
   calculateCogs,
+  calculateIngredientUsage,
   calculateInventory,
   calculateRevenue,
   createInventorySnapshot,
   findMissingIngredients,
   salesForPeriod,
+  simulateActualStock,
 } = globalThis.EsepDomain;
 
 const SEED = () => ({
@@ -132,10 +134,11 @@ function renderKassa(){
     const b=document.createElement('button'); b.className='tile';
     const missing=findMissingIngredients(p,S.ingredients).map(({ingredient})=>ingredient.name);
     b.disabled=missing.length>0;
+    b.title=missing.length?`Не хватает: ${missing.join(', ')}`:'';
     b.setAttribute('aria-label',missing.length?`${p.name}, недоступно: не хватает ${missing.join(', ')}`:`Продать ${p.name} за ${p.price} сом`);
     const rc=Object.entries(p.recipe).map(([k,q])=>`${q}${ing(k).unit} ${ing(k).name.toLowerCase()}`).join(', ');
     b.innerHTML=`<div class="emoji">${p.emoji}</div><div class="pname">${p.name}</div>
-      <div class="price num">${p.price} сом</div><div class="rc">${missing.length?'Нет на складе: '+missing.join(', '):rc}</div>`;
+      <div class="price num">${p.price} сом</div>${missing.length?`<div class="stock-status">Не хватает: ${missing.join(', ')}</div>`:`<div class="rc">${rc}</div>`}`;
     b.onclick=()=>sell(p);
     menu.appendChild(b);
   });
@@ -218,10 +221,11 @@ function renderInv(){
   document.getElementById('periodLabel').textContent=`Смена №${period.id} · пересчет начат ${new Date(S.inventoryDraft.startedAt).toLocaleString('ru-RU')}`;
   const t=document.getElementById('invTable');
   const rows=S.ingredients.map(i=>{
+    const actual=S.inventoryDraft.actual?.[i.id]??'';
     return `<tr data-id="${i.id}">
       <td class="nm">${i.name}</td>
       <td class="num">${fmt(snapshot[i.id])} ${i.unit}</td>
-      <td><input type="number" min="0" step="any" inputmode="numeric" value="" placeholder="—"> <span class="muted">${i.unit}</span></td>
+      <td><input type="number" min="0" step="any" inputmode="numeric" value="${actual}" placeholder="—" aria-label="Фактический остаток: ${i.name}"> <span class="muted">${i.unit}</span></td>
       <td class="varcell num">—</td>
       <td class="leakcell num">—</td>
     </tr>`;
@@ -235,12 +239,13 @@ function renderInv(){
 function startInventory(){
   if(S.role!=='owner'||inventoryInProgress()) return;
   const period=openPeriod();
-  S.inventoryDraft={periodId:period.id,startedAt:Date.now(),snapshot:createInventorySnapshot(S.ingredients)};
+  S.inventoryDraft={periodId:period.id,startedAt:Date.now(),snapshot:createInventorySnapshot(S.ingredients),actual:{}};
   save(); renderInv();
   showToast('Инвентаризация начата','Продажи и складские операции приостановлены до завершения или отмены.');
 }
 function recalcInv(){
   let total=0,complete=true;
+  const actualById={};
   document.querySelectorAll('#invTable tbody tr').forEach(tr=>{
     const i=ing(tr.dataset.id); const inp=tr.querySelector('input');
     const varcell=tr.querySelector('.varcell'); const leakcell=tr.querySelector('.leakcell');
@@ -251,6 +256,7 @@ function recalcInv(){
       leakcell.textContent='—';leakcell.className='leakcell num';return;
     }
     inp.classList.remove('invalid');
+    actualById[i.id]=actual;
     const diff=S.inventoryDraft.snapshot[i.id]-actual; // >0 = утекло
     const leak=Math.max(0,diff)*i.cost;
     varcell.textContent=(diff>0?'−':diff<0?'+':'')+fmt(Math.abs(diff))+' '+i.unit;
@@ -259,6 +265,8 @@ function recalcInv(){
     leakcell.className='leakcell num '+(diff>0?'var-leak':'var-ok');
     total+=leak;
   });
+  S.inventoryDraft.actual=actualById;
+  save();
   const tot=document.getElementById('invTotal');
   if(tot){tot.textContent=complete?fmt(total)+' сом':'Не проверено';tot.className='num '+(complete&&total===0?'var-ok':'var-leak');}
 }
@@ -296,10 +304,10 @@ function cancelInventory(){
 }
 function fillTheory(){ document.querySelectorAll('#invTable tbody tr').forEach(tr=>{tr.querySelector('input').value=Math.round(S.inventoryDraft.snapshot[tr.dataset.id]);}); recalcInv(); }
 function simLeak(){
-  // реалистичная недостача: чуть меньше, чем по системе
-  const gaps={milk:420, beans:35, cup:6, syrup:60, cocoa:18};
+  const usage=calculateIngredientUsage(S.sales,S.products,openPeriod().id);
+  const actual=simulateActualStock(S.ingredients,S.inventoryDraft.snapshot,usage);
   document.querySelectorAll('#invTable tbody tr').forEach(tr=>{
-    const i=ing(tr.dataset.id); tr.querySelector('input').value=Math.max(0,Math.round(S.inventoryDraft.snapshot[i.id]-(gaps[i.id]||0)));
+    tr.querySelector('input').value=actual[tr.dataset.id];
   });
   recalcInv();
 }

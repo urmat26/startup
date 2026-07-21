@@ -123,6 +123,16 @@
     letter-spacing:-6px;line-height:.9;color:var(--espresso)}
   .demo-sub{font-size:clamp(18px,2.4vw,28px);color:var(--gray);margin-top:8px;max-width:36ch}
   .demo-big .dot{color:var(--crema)}
+  .demo-result{display:inline-flex;align-items:baseline;gap:10px;margin-top:24px;padding:14px 20px;border-radius:14px;
+    background:var(--espresso);color:var(--cream);font-family:var(--display);font-weight:800;font-size:clamp(24px,4vw,46px)}
+  .demo-result small{font:500 14px var(--body);color:var(--crema)}
+  .plan-badge{display:inline-flex;padding:6px 10px;border-radius:999px;background:rgba(224,164,88,.16);color:var(--crema-deep);
+    font:700 12px var(--display);letter-spacing:.8px;text-transform:uppercase}
+  .close-grid{display:grid;grid-template-columns:1fr auto;gap:34px;align-items:center;max-width:900px;margin-top:28px}
+  .qr-placeholder{width:150px;aspect-ratio:1;border:3px dashed var(--crema-deep);border-radius:18px;display:grid;place-items:center;
+    color:var(--crema-deep);font:800 14px var(--display);text-align:center;padding:16px;background:#fff}
+  .contact{margin-top:20px;font:700 16px var(--display);color:var(--espresso)}
+  .contact a{color:var(--crema-deep);text-decoration:none}
 
   .roadmap{display:flex;flex-direction:column;gap:0;margin-top:30px;max-width:760px}
   .rm{display:flex;gap:20px;align-items:flex-start;padding:16px 0;border-bottom:1px solid var(--line)}
@@ -235,6 +245,7 @@
       <div class="eyebrow">Живьём</div>
       <div class="demo-big">DEMO<span class="dot">.</span></div>
       <div class="demo-sub">Продажа → авто-списание → сигнал → расхождение → дашборд. Кульминация: «Вот куда делись твои деньги. Больше не на глаз.»</div>
+      <div class="demo-result">≈ 22 сома <small>динамическая утечка в demo-смене</small></div>
     </section>
 
     <!-- 7 -->
@@ -247,7 +258,7 @@
           <tr><td>Цена</td><td>4 590–9 690 сом/мес</td><td>$14–59/мес</td><td class="us">Freemium</td></tr>
           <tr><td>Сложность</td><td class="no">под товароведа</td><td>широкий POS</td><td class="us">радикально простой</td></tr>
           <tr><td>Детектор утечки</td><td class="no">нет</td><td class="no">нет</td><td class="us yes">ядро продукта</td></tr>
-          <tr><td>Локальность</td><td>реселлеры</td><td>частично</td><td class="us">кыргызский · ГНС · WhatsApp</td></tr>
+          <tr><td>Локальность</td><td>реселлеры</td><td>частично</td><td class="us"><span class="plan-badge">Roadmap / Планы</span><br>кыргызский · ГНС · WhatsApp</td></tr>
         </tbody>
       </table>
       <p class="src">Существование Poster доказывает, что рынок есть — иностранцы не локализуют то, на что нет спроса. Наш ответ на «чем ты лучше Poster?» — не «дешевле», а «ими не пользуются, а мы делаем так, чтобы пользовались».</p>
@@ -262,18 +273,18 @@
         <div class="card crema"><div class="k">Подписка</div><div class="l">Склад, аналитика, детектор утечки — где живёт боль</div></div>
         <div class="card money"><div class="k num">$72–100K</div><div class="l">SOM ARR за 2–3 года при 8–12% SAM</div></div>
       </div>
-      <p class="lead">Оплата в сомах, местная поддержка в WhatsApp. Моат — простота и близость, а не цена.</p>
+      <p class="lead">Оплата в сомах. <span class="plan-badge">Roadmap / Планы</span> Поддержка через WhatsApp после пилота. Моат — простота и близость, а не цена.</p>
     </section>
 
     <!-- 9 -->
     <section class="slide">
-      <div class="eyebrow">Роадмап</div>
+      <div class="eyebrow">Roadmap / Планы</div>
       <h2>От детектора утечки — к замку на клиента</h2>
       <div class="roadmap">
         <div class="rm"><div class="stage-n">01</div><div><div class="rt">Фискализация ГНС / онлайн-ККМ</div><div class="rd">Без неё кофейне нельзя работать — это регуляторный замок</div></div></div>
-        <div class="rm"><div class="stage-n">02</div><div><div class="rt">Приёмка накладных и поставщики</div><div class="rd">Замкнуть «факт закупа» — точнее считать утечку</div></div></div>
-        <div class="rm"><div class="stage-n">03</div><div><div class="rt">Мультиточка, роли, аналитика</div><div class="rd">Рост от одной кофейни к сети</div></div></div>
-        <div class="rm"><div class="stage-n">04</div><div><div class="rt">Бары и кафе с кухней</div><div class="rd">Расширение сегмента на том же движке простоты</div></div></div>
+        <div class="rm"><div class="stage-n">02</div><div><div class="rt">Облачное хранение и поставщики</div><div class="rd">Синхронизация устройств, накладные и точный факт закупа</div></div></div>
+        <div class="rm"><div class="stage-n">03</div><div><div class="rt">Кыргызский интерфейс и мультиточка</div><div class="rd">Локализация и рост от одной кофейни к сети</div></div></div>
+        <div class="rm"><div class="stage-n">04</div><div><div class="rt">WhatsApp-отчёты владельцу</div><div class="rd">Расхождения и сигналы закупки без входа в кабинет</div></div></div>
       </div>
     </section>
 
@@ -281,7 +292,14 @@
     <section class="slide" style="justify-content:center">
       <div class="logo-wm">эсеп<span class="dot"></span></div>
       <div class="tagline">Твои деньги — на виду</div>
-      <p class="lead" style="margin-top:34px">Я не гуглил эту проблему — я в ней работал. Соло + ИИ собрал рабочее демо за неделю.<br><br><b>Дайте кофейням наконец пользоваться тем, за что они платят.</b></p>
+      <div class="close-grid">
+        <div>
+          <div class="demo-result">≈ 22 сома <small>найдено за одну demo-смену</small></div>
+          <p class="lead"><b>Ищем 3 кофейни для пилота в Бишкеке.</b><br>Я не гуглил эту проблему — я в ней работал. Соло + ИИ собрал рабочее демо за неделю.</p>
+          <div class="contact">Контакт и код: <a href="https://github.com/urmat26/startup">github.com/urmat26/startup</a></div>
+        </div>
+        <div class="qr-placeholder" aria-label="Место для QR-кода демо">QR-КОД<br>DEMO</div>
+      </div>
     </section>
 
   </main>

@@ -5,11 +5,13 @@ await import('../app/domain.js');
 
 const {
   calculateCogs,
+  calculateIngredientUsage,
   calculateInventory,
   calculateRevenue,
   createInventorySnapshot,
   findMissingIngredients,
   salesForPeriod,
+  simulateActualStock,
 } = globalThis.EsepDomain;
 
 const ingredients = [
@@ -66,4 +68,62 @@ test('inventory uses the stock snapshot captured at count start', () => {
   assert.equal(result[0].theoretical,20);
   assert.equal(result[0].difference,10);
   assert.equal(result[1].theoretical,2);
+});
+
+test('simulated shortage grows with actual shift usage', () => {
+  const oneSaleUsage=calculateIngredientUsage(sales,products,1);
+  const manySales=Array.from({length:10},()=>({productId:'esp',periodId:1}));
+  const manySalesUsage=calculateIngredientUsage(manySales,products,1);
+  const snapshot=createInventorySnapshot(ingredients);
+  const oneSaleActual=simulateActualStock(ingredients,snapshot,oneSaleUsage);
+  const manySalesActual=simulateActualStock(ingredients,snapshot,manySalesUsage);
+
+  assert.equal(oneSaleUsage.beans,18);
+  assert.equal(oneSaleUsage.cup,1);
+  assert.ok(snapshot.beans-oneSaleActual.beans < snapshot.beans-manySalesActual.beans);
+  assert.equal(snapshot.cup-oneSaleActual.cup,0);
+  assert.equal(snapshot.cup-manySalesActual.cup,1);
+});
+
+test('canceled sales do not contribute to simulated ingredient usage', () => {
+  const canceledSales=[
+    {productId:'esp',periodId:1},
+    {productId:'esp',periodId:1,canceledAt:Date.now()},
+  ];
+  const usage=calculateIngredientUsage(canceledSales,products,1);
+  assert.equal(usage.beans,18);
+  assert.equal(usage.cup,1);
+});
+
+test('hackathon demo scenario produces about 22 som leakage', () => {
+  const demoIngredients=[
+    {id:'milk',unit:'мл',stock:1450,cost:0.06},
+    {id:'beans',unit:'г',stock:892,cost:1.5},
+    {id:'cup',unit:'шт',stock:194,cost:4},
+    {id:'syrup',unit:'мл',stock:980,cost:0.5},
+    {id:'cocoa',unit:'г',stock:400,cost:2.5},
+  ];
+  const demoProducts=[
+    {id:'latte',recipe:{beans:18,milk:200,cup:1}},
+    {id:'capp',recipe:{beans:18,milk:150,cup:1}},
+    {id:'raf',recipe:{beans:18,milk:150,syrup:20,cup:1}},
+  ];
+  const demoSales=[
+    ...Array.from({length:3},()=>({productId:'latte',periodId:1})),
+    ...Array.from({length:2},()=>({productId:'capp',periodId:1})),
+    {productId:'raf',periodId:1},
+  ];
+  const snapshot=createInventorySnapshot(demoIngredients);
+  const usage=calculateIngredientUsage(demoSales,demoProducts,1);
+  const actual=simulateActualStock(demoIngredients,snapshot,usage);
+  const total=calculateInventory(demoIngredients,actual,snapshot)
+    .reduce((sum,item)=>sum+item.leak,0);
+
+  assert.deepEqual(usage,{beans:108,milk:1050,cup:6,syrup:20});
+  assert.equal(actual.milk,1366);
+  assert.equal(actual.beans,883);
+  assert.equal(actual.cup,194);
+  assert.equal(actual.syrup,973);
+  assert.equal(actual.cocoa,400);
+  assert.equal(total,22.04);
 });
