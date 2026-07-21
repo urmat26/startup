@@ -133,6 +133,17 @@
     color:var(--crema-deep);font:800 14px var(--display);text-align:center;padding:16px;background:#fff}
   .contact{margin-top:20px;font:700 16px var(--display);color:var(--espresso)}
   .contact a{color:var(--crema-deep);text-decoration:none}
+  .metric-strip{display:flex;gap:10px;flex-wrap:wrap;margin-top:20px}
+  .metric-chip{background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px 14px;min-width:120px}
+  .metric-chip b{display:block;font:800 20px var(--display);color:var(--espresso)}
+  .metric-chip span{display:block;margin-top:2px;color:var(--gray);font-size:11px}
+  .team-plan{display:grid;grid-template-columns:.9fr 1.1fr;gap:34px;max-width:1040px;margin-top:22px}
+  .team-plan h3{font:800 18px var(--display);margin-bottom:10px}
+  .team-list,.plan-list{display:flex;flex-direction:column;gap:8px}
+  .member,.plan-item{background:#fff;border:1px solid var(--line);border-radius:12px;padding:11px 14px}
+  .member b,.plan-item b{display:block;font:700 14px var(--display)}
+  .member span,.plan-item span{display:block;color:var(--gray);font-size:12px;margin-top:2px;line-height:1.35}
+  .team-count{color:var(--crema-deep);font:800 30px var(--display);margin-bottom:10px}
 
   .roadmap{display:flex;flex-direction:column;gap:0;margin-top:30px;max-width:760px}
   .rm{display:flex;gap:20px;align-items:flex-start;padding:16px 0;border-bottom:1px solid var(--line)}
@@ -151,7 +162,7 @@
 
   @media (max-width:720px){
     .rail{width:56px} .stage{left:56px}
-    .cards{grid-template-columns:1fr} .loop{gap:8px}
+    .slide{overflow-y:auto}.cards{grid-template-columns:1fr}.loop{gap:8px}.team-plan,.close-grid{grid-template-columns:1fr}.qr-placeholder{display:none}
   }
   @media (prefers-reduced-motion:reduce){
     .slide{transition:opacity .01s} .tick{transition:none}
@@ -244,8 +255,13 @@
     <section class="slide" style="align-items:flex-start;justify-content:center">
       <div class="eyebrow">Живьём</div>
       <div class="demo-big">DEMO<span class="dot">.</span></div>
-      <div class="demo-sub">Продажа → авто-списание → сигнал → расхождение → дашборд. Кульминация: «Вот куда делись твои деньги. Больше не на глаз.»</div>
-      <div class="demo-result">≈ 22 сома <small>динамическая утечка в demo-смене</small></div>
+      <div class="demo-sub"><b>Бариста:</b> касса и продажи → <b>Владелец:</b> склад, инвентаризация и дашборд.</div>
+      <div class="metric-strip">
+        <div class="metric-chip"><b>970 сом</b><span>выручка</span></div>
+        <div class="metric-chip"><b>259 сом</b><span>себестоимость</span></div>
+        <div class="metric-chip"><b>27%</b><span>food cost</span></div>
+        <div class="metric-chip"><b>≈ 22 сома</b><span>динамическая утечка</span></div>
+      </div>
     </section>
 
     <!-- 7 -->
@@ -258,7 +274,7 @@
           <tr><td>Цена</td><td>4 590–9 690 сом/мес</td><td>$14–59/мес</td><td class="us">Freemium</td></tr>
           <tr><td>Сложность</td><td class="no">под товароведа</td><td>широкий POS</td><td class="us">радикально простой</td></tr>
           <tr><td>Детектор утечки</td><td class="no">нет</td><td class="no">нет</td><td class="us yes">ядро продукта</td></tr>
-          <tr><td>Локальность</td><td>реселлеры</td><td>частично</td><td class="us"><span class="plan-badge">Roadmap / Планы</span><br>кыргызский · ГНС · WhatsApp</td></tr>
+          <tr><td>Роли</td><td>сложные права</td><td>широкая настройка</td><td class="us yes">бариста · владелец</td></tr>
         </tbody>
       </table>
       <p class="src">Существование Poster доказывает, что рынок есть — иностранцы не локализуют то, на что нет спроса. Наш ответ на «чем ты лучше Poster?» — не «дешевле», а «ими не пользуются, а мы делаем так, чтобы пользовались».</p>
@@ -273,18 +289,31 @@
         <div class="card crema"><div class="k">Подписка</div><div class="l">Склад, аналитика, детектор утечки — где живёт боль</div></div>
         <div class="card money"><div class="k num">$72–100K</div><div class="l">SOM ARR за 2–3 года при 8–12% SAM</div></div>
       </div>
-      <p class="lead">Оплата в сомах. <span class="plan-badge">Roadmap / Планы</span> Поддержка через WhatsApp после пилота. Моат — простота и близость, а не цена.</p>
+      <p class="lead">Оплата в сомах. Моат — ежедневная простота, прозрачный учет и быстрый результат, а не количество функций.</p>
     </section>
 
     <!-- 9 -->
     <section class="slide">
-      <div class="eyebrow">Roadmap / Планы</div>
-      <h2>От детектора утечки — к замку на клиента</h2>
-      <div class="roadmap">
-        <div class="rm"><div class="stage-n">01</div><div><div class="rt">Фискализация ГНС / онлайн-ККМ</div><div class="rd">Без неё кофейне нельзя работать — это регуляторный замок</div></div></div>
-        <div class="rm"><div class="stage-n">02</div><div><div class="rt">Облачное хранение и поставщики</div><div class="rd">Синхронизация устройств, накладные и точный факт закупа</div></div></div>
-        <div class="rm"><div class="stage-n">03</div><div><div class="rt">Кыргызский интерфейс и мультиточка</div><div class="rd">Локализация и рост от одной кофейни к сети</div></div></div>
-        <div class="rm"><div class="stage-n">04</div><div><div class="rt">WhatsApp-отчёты владельцу</div><div class="rd">Расхождения и сигналы закупки без входа в кабинет</div></div></div>
+      <div class="eyebrow">Команда и Roadmap</div>
+      <h2>3 человека. Один измеримый результат.</h2>
+      <div class="team-plan">
+        <div>
+          <div class="team-count">Команда из 3 специалистов</div>
+          <div class="team-list">
+            <div class="member"><b>Питчер / Бизнес</b><span>Проблема, рынок, интервью и защита проекта</span></div>
+            <div class="member"><b>Продукт / Демо</b><span>Пользовательский сценарий, интерфейс и live demo</span></div>
+            <div class="member"><b>Аналитика / Техническая часть</b><span>Расчеты, учетная логика, тесты и надежность</span></div>
+          </div>
+        </div>
+        <div>
+          <h3><span class="plan-badge">Roadmap / Планы</span></h3>
+          <div class="plan-list">
+            <div class="plan-item"><b>Импорт из Poster / iiko</b><span>Получать продажи без замены текущей кассы</span></div>
+            <div class="plan-item"><b>Облачная синхронизация</b><span>Несколько устройств, резервное хранение и мультиточка</span></div>
+            <div class="plan-item"><b>Кыргызский язык и ГНС</b><span>Локализация и фискализация после пилота</span></div>
+            <div class="plan-item"><b>WhatsApp-отчёты</b><span>Сигналы закупки и расхождения владельцу</span></div>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -295,7 +324,12 @@
       <div class="close-grid">
         <div>
           <div class="demo-result">≈ 22 сома <small>найдено за одну demo-смену</small></div>
-          <p class="lead"><b>Ищем 3 кофейни для пилота в Бишкеке.</b><br>Я не гуглил эту проблему — я в ней работал. Соло + ИИ собрал рабочее демо за неделю.</p>
+          <div class="metric-strip">
+            <div class="metric-chip"><b>970 сом</b><span>выручка</span></div>
+            <div class="metric-chip"><b>259 сом</b><span>себестоимость</span></div>
+            <div class="metric-chip"><b>27%</b><span>food cost</span></div>
+          </div>
+          <p class="lead"><b>Ищем 3 кофейни для пилота в Бишкеке.</b><br>Команда из 3 человек превратила реальную боль кофейни в работающий MVP.</p>
           <div class="contact">Контакт и код: <a href="https://github.com/urmat26/startup">github.com/urmat26/startup</a></div>
         </div>
         <div class="qr-placeholder" aria-label="Место для QR-кода демо">QR-КОД<br>DEMO</div>
