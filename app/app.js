@@ -27,6 +27,7 @@ const SEED = () => ({
   periods:[{id:1,openedAt:Date.now(),closedAt:null}],
   movements:[],
   inventories:[],
+  inventoryDraft:null,
   lastInventory:null,
 });
 const KEY='esep-demo-v1';
@@ -39,6 +40,7 @@ if(!S.role) S.role='owner';
 if(!Array.isArray(S.periods)||!S.periods.length) S.periods=[{id:1,openedAt:Date.now(),closedAt:null}];
 if(!Array.isArray(S.movements)) S.movements=[];
 if(!Array.isArray(S.inventories)) S.inventories=S.lastInventory?[S.lastInventory]:[];
+if(!('inventoryDraft' in S)) S.inventoryDraft=null;
 const openPeriod = () => S.periods.findLast ? S.periods.findLast(p=>!p.closedAt) : [...S.periods].reverse().find(p=>!p.closedAt);
 S.sales.forEach(x=>{ if(!x.periodId) x.periodId=openPeriod().id; });
 save();
@@ -55,6 +57,7 @@ const addMovement = (ingredientId,type,qty,note='') => S.movements.push({
 
 /* ---------- KASSA ---------- */
 function sell(p){
+  if(S.inventoryDraft) return showToast('Продажа временно недоступна','Сначала закрой или отмени начатый пересчёт склада.');
   const missing=findMissingIngredients(p,S.ingredients).map(({ingredient,qty})=>({i:ingredient,q:qty}));
   if(missing.length){
     const detail=missing.map(({i,q})=>`${i.name}: нужно ${q} ${i.unit}, осталось ${fmt(Math.max(0,i.stock))} ${i.unit}`).join(' · ');
@@ -69,6 +72,7 @@ function sell(p){
   showToast(`${p.name} · ${p.price} сом`, ded);
 }
 function cancelLastSale(){
+  if(S.inventoryDraft) return showToast('Отмена временно недоступна','Сначала закрой или отмени начатый пересчёт склада.');
   const sale=[...S.sales].reverse().find(x=>x.periodId===openPeriod().id&&!x.canceledAt);
   if(!sale) return showToast('Отменять нечего','В текущей смене нет активных продаж.');
   const product=S.products.find(p=>p.id===sale.productId);
@@ -151,6 +155,7 @@ function renderStock(){
 }
 function adjustStock(id,type){
   if(S.role!=='owner') return showToast('Недостаточно прав','Приход и списание доступны владельцу.');
+  if(S.inventoryDraft) return showToast('Склад временно закрыт','Сначала закрой или отмени начатый пересчёт.');
   const i=ing(id); const raw=prompt(`${type==='receipt'?'Приход':'Списание'}: ${i.name}, ${i.unit}`);
   if(raw===null) return;
   const qty=Number(String(raw).replace(',','.'));
@@ -168,12 +173,24 @@ function renderInv(){
     return;
   }
   document.getElementById('periodLabel').textContent=`Смена №${openPeriod().id} · открыта ${new Date(openPeriod().openedAt).toLocaleString('ru-RU')}`;
+  const active=Boolean(S.inventoryDraft);
+  document.getElementById('startInv').disabled=active;
+  document.getElementById('fillTheory').disabled=!active;
+  document.getElementById('simLeak').disabled=!active;
+  document.getElementById('applyInv').disabled=!active;
+  document.getElementById('cancelInv').disabled=!active;
   const t=document.getElementById('invTable');
+  if(!active){
+    t.innerHTML='<tbody><tr><td>Начни пересчёт — Эсеп зафиксирует текущие остатки и сохранит введённые значения.</td></tr></tbody>';
+    return;
+  }
   const rows=S.ingredients.map(i=>{
+    const theoretical=S.inventoryDraft.snapshot[i.id];
+    const actual=S.inventoryDraft.actual[i.id]??'';
     return `<tr data-id="${i.id}">
       <td class="nm">${i.name}</td>
-      <td class="num">${fmt(i.stock)} ${i.unit}</td>
-      <td><input type="number" min="0" step="any" inputmode="numeric" value="" placeholder="—"> <span class="muted">${i.unit}</span></td>
+      <td class="num">${fmt(theoretical)} ${i.unit}</td>
+      <td><input type="number" min="0" step="any" inputmode="numeric" value="${actual}" placeholder="—"> <span class="muted">${i.unit}</span></td>
       <td class="varcell num">—</td>
       <td class="leakcell num">—</td>
     </tr>`;
@@ -181,8 +198,29 @@ function renderInv(){
   t.innerHTML=`<thead><tr><th>Ингредиент</th><th>По системе</th><th>Факт (насчитал)</th><th>Расхождение</th><th>≈ сом</th></tr></thead>
     <tbody>${rows}</tbody>
     <tfoot><tr><td colspan="4" style="text-align:right">Итого утечка за смену</td><td class="num" id="invTotal">—</td></tr></tfoot>`;
-  t.querySelectorAll('input').forEach(inp=>inp.addEventListener('input',recalcInv));
+  t.querySelectorAll('input').forEach(inp=>inp.addEventListener('input',()=>{syncInventoryDraft();recalcInv();}));
   recalcInv();
+}
+function startInventory(){
+  if(S.inventoryDraft) return;
+  S.inventoryDraft={
+    periodId:openPeriod().id,
+    startedAt:Date.now(),
+    snapshot:Object.fromEntries(S.ingredients.map(i=>[i.id,i.stock])),
+    actual:{},
+  };
+  save(); renderInv();
+  showToast('Пересчёт начат','Продажи и движения склада приостановлены до его завершения.');
+}
+function syncInventoryDraft(){
+  if(!S.inventoryDraft) return;
+  const actual={};
+  document.querySelectorAll('#invTable tbody tr').forEach(tr=>{
+    const value=tr.querySelector('input')?.value;
+    if(value!==undefined&&value!=='') actual[tr.dataset.id]=Number(value);
+  });
+  S.inventoryDraft.actual=actual;
+  save();
 }
 function recalcInv(){
   let total=0;
@@ -190,7 +228,7 @@ function recalcInv(){
     const i=ing(tr.dataset.id); const inp=tr.querySelector('input');
     const varcell=tr.querySelector('.varcell'); const leakcell=tr.querySelector('.leakcell');
     if(inp.value===''){varcell.textContent='—';varcell.className='varcell num';leakcell.textContent='—';leakcell.className='leakcell num';return;}
-    const actual=parseFloat(inp.value)||0; const diff=i.stock-actual; // >0 = утекло
+    const actual=parseFloat(inp.value)||0; const diff=S.inventoryDraft.snapshot[i.id]-actual; // >0 = утекло
     const leak=Math.max(0,diff)*i.cost;
     varcell.textContent=(diff>0?'−':diff<0?'+':'')+fmt(Math.abs(diff))+' '+i.unit;
     varcell.className='varcell num '+(diff>0?'var-leak':'var-ok');
@@ -202,6 +240,7 @@ function recalcInv(){
   if(tot){tot.textContent=fmt(total)+' сом'; tot.className='num '+(total>0?'var-leak':'var-ok');}
 }
 function applyInv(){
+  if(!S.inventoryDraft) return showToast('Пересчёт не начат','Нажми «Начать пересчёт».');
   const actualById={};
   let invalid=false;
   document.querySelectorAll('#invTable tbody tr').forEach(tr=>{
@@ -213,7 +252,8 @@ function applyInv(){
     showToast('Инвентаризация не закрыта','Введи фактический неотрицательный остаток для каждого ингредиента.');
     return;
   }
-  const items=calculateInventory(S.ingredients,actualById).map(item=>{
+  const snapshotIngredients=S.ingredients.map(i=>({...i,stock:S.inventoryDraft.snapshot[i.id]}));
+  const items=calculateInventory(snapshotIngredients,actualById).map(item=>{
     const i=ing(item.id);
     return {...item,name:i.name,unit:i.unit,diff:item.difference};
   });
@@ -224,16 +264,23 @@ function applyInv(){
   items.forEach(item=>{ const delta=item.actual-item.theoretical; ing(item.id).stock=item.actual; if(delta) addMovement(item.id,'inventory',delta); });
   period.closedAt=closedAt;
   S.periods.push({id:Math.max(...S.periods.map(p=>p.id))+1,openedAt:closedAt,closedAt:null});
+  S.inventoryDraft=null;
   save(); renderDash(); switchView('dash');
 }
-function fillTheory(){ document.querySelectorAll('#invTable tbody tr').forEach(tr=>{tr.querySelector('input').value=Math.round(ing(tr.dataset.id).stock);}); recalcInv(); }
+function fillTheory(){ document.querySelectorAll('#invTable tbody tr').forEach(tr=>{tr.querySelector('input').value=Math.round(S.inventoryDraft.snapshot[tr.dataset.id]);}); syncInventoryDraft(); recalcInv(); }
 function simLeak(){
   // реалистичная недостача: чуть меньше, чем по системе
   const gaps={milk:420, beans:35, cup:6, syrup:60, cocoa:18};
   document.querySelectorAll('#invTable tbody tr').forEach(tr=>{
-    const i=ing(tr.dataset.id); tr.querySelector('input').value=Math.max(0,Math.round(i.stock-(gaps[i.id]||0)));
+    const i=ing(tr.dataset.id); tr.querySelector('input').value=Math.max(0,Math.round(S.inventoryDraft.snapshot[i.id]-(gaps[i.id]||0)));
   });
-  recalcInv();
+  syncInventoryDraft(); recalcInv();
+}
+function cancelInventory(){
+  if(!S.inventoryDraft) return;
+  if(!confirm('Отменить пересчёт? Введённые значения будут удалены.')) return;
+  S.inventoryDraft=null; save(); renderInv();
+  showToast('Пересчёт отменён','Касса и движения склада снова доступны.');
 }
 
 /* ---------- DASHBOARD ---------- */
@@ -305,11 +352,18 @@ function applyRole(){
 document.getElementById('tabs').addEventListener('click',e=>{const b=e.target.closest('button'); if(b) switchView(b.dataset.v);});
 document.getElementById('reset').onclick=()=>{ if(confirm('Сбросить демо к начальным данным?')){ S=SEED(); save(); switchView('kassa'); renderAll(); } };
 document.getElementById('applyInv').onclick=applyInv;
+document.getElementById('startInv').onclick=startInventory;
 document.getElementById('fillTheory').onclick=fillTheory;
 document.getElementById('simLeak').onclick=simLeak;
+document.getElementById('cancelInv').onclick=cancelInventory;
 document.getElementById('undoSale').onclick=cancelLastSale;
 document.getElementById('role').onchange=e=>{
   const current=document.querySelector('.view.on')?.id.replace('v-','')||'kassa';
+  if(S.inventoryDraft&&e.target.value==='barista'){
+    e.target.value='owner';
+    showToast('Смена роли недоступна','Сначала закрой или отмени пересчёт склада.');
+    return;
+  }
   S.role=e.target.value;
   save();
   applyRole();
