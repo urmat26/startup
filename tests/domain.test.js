@@ -9,7 +9,9 @@ const {
   calculateInventory,
   calculateRevenue,
   createInventorySnapshot,
+  findLowStock,
   findMissingIngredients,
+  roundMoney,
   salesForPeriod,
   simulateActualStock,
 } = globalThis.EsepDomain;
@@ -32,6 +34,14 @@ test('period metrics include only sales from the selected shift', () => {
   assert.equal(calculateCogs(sales, products, ingredients, 1), 31);
 });
 
+test('historical sale snapshots are stable after catalog changes', () => {
+  const snapshotSales=[{productId:'esp',periodId:1,unitPrice:95,cogs:32}];
+  const changedProducts=[{...products[0],price:150}];
+  const changedIngredients=ingredients.map(i=>({...i,cost:i.cost*2}));
+  assert.equal(calculateRevenue(snapshotSales,changedProducts,1),95);
+  assert.equal(calculateCogs(snapshotSales,changedProducts,changedIngredients,1),32);
+});
+
 test('canceled sales are excluded from shift metrics', () => {
   const canceled = [
     ...sales,
@@ -50,10 +60,25 @@ test('sale is blocked when any recipe ingredient is missing', () => {
   assert.deepEqual(missing.map(({ ingredient }) => ingredient.id), ['beans']);
 });
 
-test('inventory converts shortage into money and ignores surplus', () => {
+test('inventory converts shortage and surplus into money', () => {
   const result = calculateInventory(ingredients, { beans: 10, cup: 3 });
   assert.equal(result[0].leak, 15);
   assert.equal(result[1].leak, 0);
+  assert.equal(result[1].overageValue,4);
+  assert.equal(result[1].netValue,-4);
+});
+
+test('low-stock warning works for every ingredient, not only milk', () => {
+  const low=findLowStock([
+    {id:'milk',stock:20,threshold:10},
+    {id:'beans',stock:4,threshold:5},
+    {id:'cup',stock:0,threshold:1},
+  ]);
+  assert.deepEqual(low.map(i=>i.id),['beans','cup']);
+});
+
+test('money is rounded to two decimal places',()=>{
+  assert.equal(roundMoney(0.1+0.2),0.3);
 });
 
 test('inventory rejects incomplete or negative actual stock', () => {
@@ -93,6 +118,12 @@ test('canceled sales do not contribute to simulated ingredient usage', () => {
   const usage=calculateIngredientUsage(canceledSales,products,1);
   assert.equal(usage.beans,18);
   assert.equal(usage.cup,1);
+});
+
+test('ingredient usage uses the recipe captured by the sale', () => {
+  const changedProducts=[{...products[0],recipe:{beans:1,cup:1}}];
+  const snapshotSales=[{productId:'esp',periodId:1,recipeSnapshot:{beans:18,cup:1}}];
+  assert.deepEqual(calculateIngredientUsage(snapshotSales,changedProducts,1),{beans:18,cup:1});
 });
 
 test('hackathon demo scenario produces about 22 som leakage', () => {

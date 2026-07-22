@@ -129,8 +129,9 @@
   .plan-badge{display:inline-flex;padding:6px 10px;border-radius:999px;background:rgba(224,164,88,.16);color:var(--crema-deep);
     font:700 12px var(--display);letter-spacing:.8px;text-transform:uppercase}
   .close-grid{display:grid;grid-template-columns:1fr auto;gap:34px;align-items:center;max-width:900px;margin-top:28px}
-  .qr-placeholder{width:150px;aspect-ratio:1;border:3px dashed var(--crema-deep);border-radius:18px;display:grid;place-items:center;
-    color:var(--crema-deep);font:800 14px var(--display);text-align:center;padding:16px;background:#fff}
+  .qr-link{width:210px;display:flex;flex-direction:column;gap:8px;align-items:center;color:var(--crema-deep);
+    font:800 11px var(--display);text-align:center;text-decoration:none}
+  .qr-link img{display:block;width:210px;height:210px;border:10px solid #fff;border-radius:20px;box-shadow:0 8px 24px rgba(36,26,21,.12)}
   .contact{margin-top:20px;font:700 16px var(--display);color:var(--espresso)}
   .contact a{color:var(--crema-deep);text-decoration:none}
   .metric-strip{display:flex;gap:10px;flex-wrap:wrap;margin-top:20px}
@@ -162,7 +163,7 @@
 
   @media (max-width:720px){
     .rail{width:56px} .stage{left:56px}
-    .slide{overflow-y:auto}.cards{grid-template-columns:1fr}.loop{gap:8px}.team-plan,.close-grid{grid-template-columns:1fr}.qr-placeholder{display:none}
+    .slide{overflow-y:auto}.cards{grid-template-columns:1fr}.loop{gap:8px}.team-plan,.close-grid{grid-template-columns:1fr}.qr-link{display:none}
   }
   @media (prefers-reduced-motion:reduce){
     .slide{transition:opacity .01s} .tick{transition:none}
@@ -222,7 +223,7 @@
         <div class="card leak"><div class="k num">~80%</div><div class="l">Закуп в нашем кейсе — в 4 раза выше нормы</div></div>
         <div class="card leak"><div class="k num">до 20%</div><div class="l">прибыли съедают потери; 75% усушки — воровство персонала</div></div>
       </div>
-      <p class="src">Владелец не может отличить: деньги лежат на складе или утекли. Эсеп разделяет — сколько ушло в чашки, сколько на полке, сколько украдено.</p>
+      <p class="src">Владелец не может отличить: деньги лежат на складе или утекли. Эсеп разделяет расход по продажам, остаток на полке и необъяснимое расхождение — без автоматических обвинений персонала.</p>
     </section>
 
     <!-- 4 -->
@@ -285,8 +286,8 @@
       <div class="eyebrow">Бизнес-модель</div>
       <h2>Freemium: заходим кассой, зарабатываем на складе</h2>
       <div class="cards">
-        <div class="card"><div class="k">Бесплатно</div><div class="l">Касса — низкий барьер захода, рост базы</div></div>
-        <div class="card crema"><div class="k">Подписка</div><div class="l">Склад, аналитика, детектор утечки — где живёт боль</div></div>
+        <div class="card"><div class="k">Пилот</div><div class="l">Бесплатная неделя на реальных данных кофейни</div></div>
+        <div class="card crema"><div class="k num">2 600 сом</div><div class="l">Подписка за точку в месяц: склад, аналитика, детектор утечки</div></div>
         <div class="card money"><div class="k num">$72–100K</div><div class="l">SOM ARR за 2–3 года при 8–12% SAM</div></div>
       </div>
       <p class="lead">Оплата в сомах. Моат — ежедневная простота, прозрачный учет и быстрый результат, а не количество функций.</p>
@@ -298,11 +299,11 @@
       <h2>3 человека. Один измеримый результат.</h2>
       <div class="team-plan">
         <div>
-          <div class="team-count">Команда из 3 специалистов</div>
+          <div class="team-count">CODE-FORGE · 3 специалиста</div>
           <div class="team-list">
-            <div class="member"><b>Питчер / Бизнес</b><span>Проблема, рынок, интервью и защита проекта</span></div>
-            <div class="member"><b>Продукт / Демо</b><span>Пользовательский сценарий, интерфейс и live demo</span></div>
-            <div class="member"><b>Аналитика / Техническая часть</b><span>Расчеты, учетная логика, тесты и надежность</span></div>
+            <div class="member"><b>Ратмир · Питчер / Бизнес</b><span>Проблема, Customer Discovery, рынок, продуктовые решения и защита</span></div>
+            <div class="member"><b>Урмат · Продукт / Демо</b><span>Пользовательский сценарий, интерфейс и live demo</span></div>
+            <div class="member"><b>Салман · Аналитика / Техническая часть</b><span>Расчеты, учетная логика, тесты и надежность</span></div>
           </div>
         </div>
         <div>
@@ -329,10 +330,13 @@
             <div class="metric-chip"><b>259 сом</b><span>себестоимость</span></div>
             <div class="metric-chip"><b>27%</b><span>food cost</span></div>
           </div>
-          <p class="lead"><b>Ищем 3 кофейни для пилота в Бишкеке.</b><br>Команда из 3 человек превратила реальную боль кофейни в работающий MVP.</p>
-          <div class="contact">Контакт и код: <a href="https://github.com/urmat26/startup">github.com/urmat26/startup</a></div>
+          <p class="lead"><b>Ищем 3 кофейни для пилота в Бишкеке.</b><br>Команда CODE-FORGE: Ратмир, Урмат и Салман превратили реальную боль кофейни в работающий MVP.</p>
+          <div class="contact">Демо: <a href="https://startup-lime-pi.vercel.app/app/index.html">startup-lime-pi.vercel.app</a><br>Код: <a href="https://github.com/urmat26/startup">github.com/urmat26/startup</a></div>
         </div>
-        <div class="qr-placeholder" aria-label="Место для QR-кода демо">QR-КОД<br>DEMO</div>
+        <a class="qr-link" href="https://startup-lime-pi.vercel.app/app/index.html" aria-label="Открыть демо Esep">
+          <img src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&amp;data=https%3A%2F%2Fstartup-lime-pi.vercel.app%2Fapp%2Findex.html" alt="QR-код демо Esep">
+          Открыть live demo
+        </a>
       </div>
     </section>
 

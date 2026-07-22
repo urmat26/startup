@@ -4,12 +4,15 @@ const {
   calculateInventory,
   calculateRevenue,
   createInventorySnapshot,
+  findLowStock,
   findMissingIngredients,
+  roundMoney,
   salesForPeriod,
   simulateActualStock,
 } = globalThis.EsepDomain;
 
 const SEED = () => ({
+  schemaVersion:2,
   ingredients:[
     {id:'milk', name:'Молоко', unit:'мл', stock:2500, start:2500, threshold:1500, cost:0.06},
     {id:'beans',name:'Зёрна',  unit:'г',  stock:1000, start:1000, threshold:300,  cost:1.5},
@@ -33,8 +36,41 @@ const SEED = () => ({
   lastInventory:null,
   inventoryDraft:null,
 });
-const KEY='esep-demo-v1';
+const KEY='esep-demo-v2';
 let S=initializeState();
+const isFiniteNonNegative = value => Number.isFinite(value)&&value>=0;
+function validateState(state){
+  if(!state||state.schemaVersion!==2||!Array.isArray(state.ingredients)||!Array.isArray(state.products)||!Array.isArray(state.sales)) return false;
+  const ingredientIds=new Set(state.ingredients.map(i=>i?.id));
+  const productIds=new Set(state.products.map(p=>p?.id));
+  if(ingredientIds.size!==state.ingredients.length||productIds.size!==state.products.length) return false;
+  if(!state.ingredients.every(i=>i&&typeof i.id==='string'&&typeof i.name==='string'&&typeof i.unit==='string'
+    &&isFiniteNonNegative(i.stock)&&isFiniteNonNegative(i.start)&&isFiniteNonNegative(i.threshold)&&isFiniteNonNegative(i.cost))) return false;
+  if(!state.products.every(p=>p&&typeof p.id==='string'&&typeof p.name==='string'&&isFiniteNonNegative(p.price)
+    &&p.recipe&&Object.entries(p.recipe).length>0&&Object.entries(p.recipe).every(([id,qty])=>ingredientIds.has(id)&&Number.isFinite(qty)&&qty>0))) return false;
+  if(state.role!=='owner'&&state.role!=='barista') return false;
+  if(!Array.isArray(state.periods)||state.periods.filter(p=>p&&p.closedAt==null).length!==1) return false;
+  const periodIds=new Set(state.periods.map(p=>p?.id));
+  if(periodIds.size!==state.periods.length||!state.periods.every(p=>p&&Number.isFinite(p.id)&&Number.isFinite(p.openedAt))) return false;
+  if(!Array.isArray(state.movements)||!Array.isArray(state.inventories)) return false;
+  if(new Set(state.sales.map(sale=>sale?.id)).size!==state.sales.length||new Set(state.movements.map(event=>event?.id)).size!==state.movements.length) return false;
+  if(!state.sales.every(sale=>sale&&typeof sale.id==='string'&&productIds.has(sale.productId)&&periodIds.has(sale.periodId)&&Number.isFinite(sale.ts)
+    &&(sale.canceledAt==null||Number.isFinite(sale.canceledAt))&&isFiniteNonNegative(sale.unitPrice)&&isFiniteNonNegative(sale.cogs)&&sale.recipeSnapshot
+    &&Object.entries(sale.recipeSnapshot).every(([id,qty])=>ingredientIds.has(id)&&Number.isFinite(qty)&&qty>0))) return false;
+  if(!state.movements.every(event=>event&&typeof event.id==='string'&&ingredientIds.has(event.ingredientId)&&periodIds.has(event.periodId)&&Number.isFinite(event.qty)&&Number.isFinite(event.ts))) return false;
+  if(!state.inventories.every(inventory=>inventory&&typeof inventory.id==='string'&&periodIds.has(inventory.periodId)&&Number.isFinite(inventory.closedAt)
+    &&Array.isArray(inventory.items)&&isFiniteNonNegative(inventory.total))) return false;
+  if(state.lastInventory&&!state.inventories.some(inventory=>inventory.id===state.lastInventory.id)) return false;
+  if(state.inventoryDraft){
+    if(!Number.isFinite(state.inventoryDraft.periodId)||!Number.isFinite(state.inventoryDraft.startedAt)||!state.inventoryDraft.snapshot) return false;
+    if(!state.ingredients.every(i=>isFiniteNonNegative(state.inventoryDraft.snapshot[i.id]))) return false;
+    if(state.inventoryDraft.actual&&!Object.values(state.inventoryDraft.actual).every(isFiniteNonNegative)) return false;
+  }
+  return state.ingredients.every(ingredient=>{
+    const projected=ingredient.start+state.movements.filter(event=>event.ingredientId===ingredient.id).reduce((sum,event)=>sum+event.qty,0);
+    return Math.abs(projected-ingredient.stock)<1e-7;
+  });
+}
 function initializeState(){
   try{
     const raw=localStorage.getItem(KEY);
@@ -44,27 +80,7 @@ function initializeState(){
       return state;
     }
     const state=JSON.parse(raw);
-    const valid=state&&Array.isArray(state.ingredients)&&Array.isArray(state.products)&&Array.isArray(state.sales)
-      &&state.ingredients.every(i=>i&&typeof i.id==='string'&&Number.isFinite(i.stock)&&Number.isFinite(i.cost))
-      &&state.products.every(p=>p&&typeof p.id==='string'&&p.recipe&&typeof p.recipe==='object');
-    if(!valid) throw new TypeError('Invalid stored state');
-
-    if(!('lastInventory' in state)){state.lastInventory=null;delete state.inv;}
-    if(!state.role) state.role='owner';
-    if(!Array.isArray(state.periods)||!state.periods.length) state.periods=[{id:1,openedAt:Date.now(),closedAt:null}];
-    if(!Array.isArray(state.movements)) state.movements=[];
-    if(!Array.isArray(state.inventories)) state.inventories=state.lastInventory?[state.lastInventory]:[];
-    if(!('inventoryDraft' in state)) state.inventoryDraft=null;
-    if(state.lastInventory&&!Array.isArray(state.lastInventory.items)) state.lastInventory=null;
-    if(state.inventoryDraft&&(!state.inventoryDraft.snapshot||typeof state.inventoryDraft.snapshot!=='object')) state.inventoryDraft=null;
-
-    let period=[...state.periods].reverse().find(p=>!p.closedAt);
-    if(!period){
-      const nextId=Math.max(0,...state.periods.map(p=>Number(p.id)||0))+1;
-      period={id:nextId,openedAt:Date.now(),closedAt:null};
-      state.periods.push(period);
-    }
-    state.sales.forEach(sale=>{if(!sale.periodId) sale.periodId=period.id;});
+    if(!validateState(state)) throw new TypeError('Invalid stored state');
     localStorage.setItem(KEY,JSON.stringify(state));
     return state;
   }catch(error){
@@ -76,19 +92,26 @@ function initializeState(){
     return state;
   }
 }
-function save(){ try{localStorage.setItem(KEY, JSON.stringify(S));}catch(e){} }
+function save(){try{if(!validateState(S))return false;localStorage.setItem(KEY,JSON.stringify(S));return true;}catch(error){return false;}}
+const cloneState=()=>JSON.parse(JSON.stringify(S));
+function transact(mutator){
+  const previous=cloneState();
+  try{mutator();if(!save()) throw new Error('Storage write failed');return true;}
+  catch(error){S=previous;return false;}
+}
 
 const openPeriod = () => S.periods.findLast ? S.periods.findLast(p=>!p.closedAt) : [...S.periods].reverse().find(p=>!p.closedAt);
 
 const fmt = n => Math.round(n).toLocaleString('ru-RU');
 const ing = id => S.ingredients.find(i=>i.id===id);
-const cogsOf = p => Object.entries(p.recipe).reduce((s,[k,q])=>s+ing(k).cost*q,0);
+const esc = value => String(value).replace(/[&<>'"]/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));
+const makeId = prefix => `${prefix}-${globalThis.crypto?.randomUUID?.()||`${Date.now()}-${Math.random()}`}`;
 const periodSales = (id=openPeriod().id) => salesForPeriod(S.sales,id);
 const revenue = (id=openPeriod().id) => calculateRevenue(S.sales,S.products,id);
 const cogsSold = (id=openPeriod().id) => calculateCogs(S.sales,S.products,S.ingredients,id);
 const inventoryInProgress = () => S.inventoryDraft?.periodId===openPeriod().id;
-const addMovement = (ingredientId,type,qty,note='') => S.movements.push({
-  id:Date.now()+Math.random(),periodId:openPeriod().id,ingredientId,type,qty,note,ts:Date.now()
+const addMovement = (ingredientId,type,qty,note='',sourceId=null) => S.movements.push({
+  id:makeId('event'),periodId:openPeriod().id,ingredientId,type,qty,note,sourceId,ts:Date.now()
 });
 
 /* ---------- KASSA ---------- */
@@ -100,9 +123,15 @@ function sell(p){
     showToast('Продажа невозможна — не хватает на складе',detail);
     return;
   }
-  for(const [k,q] of Object.entries(p.recipe)){ ing(k).stock -= q; addMovement(k,'sale',-q,p.name); }
-  S.sales.push({productId:p.id,periodId:openPeriod().id,ts:Date.now()});
-  save(); renderAll();
+  const saleId=makeId('sale');
+  const recipeSnapshot=Object.fromEntries(Object.entries(p.recipe));
+  const cogs=roundMoney(Object.entries(recipeSnapshot).reduce((sum,[id,qty])=>sum+ing(id).cost*qty,0));
+  const saved=transact(()=>{
+    for(const [id,qty] of Object.entries(recipeSnapshot)){ing(id).stock-=qty;addMovement(id,'sale',-qty,p.name,saleId);}
+    S.sales.push({id:saleId,productId:p.id,productName:p.name,unitPrice:p.price,cogs,recipeSnapshot,periodId:openPeriod().id,ts:Date.now()});
+  });
+  if(!saved){renderAll();showToast('Продажа не сохранена','Хранилище недоступно. Повтори операцию.');return;}
+  renderAll();
   const ded = Object.entries(p.recipe).map(([k,q])=>`−${q} ${ing(k).unit} ${ing(k).name.toLowerCase()}`).join(' · ');
   showToast(`${p.name} · ${p.price} сом`, ded);
 }
@@ -111,14 +140,20 @@ function cancelLastSale(){
   const sale=[...S.sales].reverse().find(x=>x.periodId===openPeriod().id&&!x.canceledAt);
   if(!sale) return showToast('Отменять нечего','В текущей смене нет активных продаж.');
   const product=S.products.find(p=>p.id===sale.productId);
-  if(!product) return showToast('Продажа не отменена','Товар больше не найден в меню.');
-  sale.canceledAt=Date.now();
-  for(const [ingredientId,quantity] of Object.entries(product.recipe)){
-    ing(ingredientId).stock+=quantity;
-    addMovement(ingredientId,'refund',quantity,product.name);
-  }
-  save(); renderAll();
-  showToast('Продажа отменена',`${product.name} · ингредиенты возвращены на склад`);
+  const recipe=sale.recipeSnapshot||product?.recipe;
+  if(!recipe) return showToast('Продажа не отменена','Состав исходной продажи не найден.');
+  const productName=sale.productName||product?.name||'Товар';
+  const saved=transact(()=>{
+    sale.canceledAt=Date.now();
+    for(const [ingredientId,quantity] of Object.entries(recipe)){
+      const ingredient=ing(ingredientId);if(!ingredient) throw new Error('Ingredient not found');
+      ingredient.stock+=quantity;
+      addMovement(ingredientId,'refund',quantity,productName,sale.id);
+    }
+  });
+  if(!saved){renderAll();showToast('Отмена не сохранена','Хранилище недоступно. Повтори операцию.');return;}
+  renderAll();
+  showToast('Продажа отменена',`${productName} · ингредиенты возвращены на склад`);
 }
 let toastTimer;
 function showToast(t1,t2){
@@ -137,8 +172,8 @@ function renderKassa(){
     b.title=missing.length?`Не хватает: ${missing.join(', ')}`:'';
     b.setAttribute('aria-label',missing.length?`${p.name}, недоступно: не хватает ${missing.join(', ')}`:`Продать ${p.name} за ${p.price} сом`);
     const rc=Object.entries(p.recipe).map(([k,q])=>`${q}${ing(k).unit} ${ing(k).name.toLowerCase()}`).join(', ');
-    b.innerHTML=`<div class="emoji">${p.emoji}</div><div class="pname">${p.name}</div>
-      <div class="price num">${p.price} сом</div>${missing.length?`<div class="stock-status">Не хватает: ${missing.join(', ')}</div>`:`<div class="rc">${rc}</div>`}`;
+    b.innerHTML=`<div class="emoji">${esc(p.emoji)}</div><div class="pname">${esc(p.name)}</div>
+      <div class="price num">${p.price} сом</div>${missing.length?`<div class="stock-status">Не хватает: ${esc(missing.join(', '))}</div>`:`<div class="rc">${esc(rc)}</div>`}`;
     b.onclick=()=>sell(p);
     menu.appendChild(b);
   });
@@ -152,7 +187,7 @@ function renderKassa(){
     currentSales.forEach(x=>counts[x.productId]=(counts[x.productId]||0)+1);
     feed.innerHTML=Object.entries(counts).map(([id,c])=>{
       const p=S.products.find(p=>p.id===id);
-      return `<div class="row"><span>${p.name}</span><span class="d num">×${c}</span></div>`;
+      return `<div class="row"><span>${esc(p?.name||'Неизвестный товар')}</span><span class="d num">×${c}</span></div>`;
     }).join('');
   }
   document.getElementById('undoSale').disabled=!currentSales.length;
@@ -160,11 +195,11 @@ function renderKassa(){
 
 /* ---------- STOCK ---------- */
 function renderStock(){
-  const alerts=document.getElementById('alerts'); const low=S.ingredients.filter(i=>i.stock<i.threshold);
+  const alerts=document.getElementById('alerts'); const low=findLowStock(S.ingredients);
   alerts.innerHTML = low.length ? low.map(i=>{
     const need=Math.ceil((i.start-i.stock)/ (i.unit==='мл'?1000:i.unit==='г'?1000:1));
     const nu = i.unit==='мл'?'л':i.unit==='г'?'кг':'шт';
-    return `<div class="alert"><span class="ico">🔴</span><span class="txt"><b>${i.name}</b> заканчивается — осталось ${fmt(i.stock)} ${i.unit}. Пора заказать ≈ ${need} ${nu}.</span></div>`;
+    return `<div class="alert"><span class="ico">🔴</span><span class="txt"><b>${esc(i.name)}</b> заканчивается — осталось ${fmt(i.stock)} ${esc(i.unit)}. Пора заказать ≈ ${need} ${esc(nu)}.</span></div>`;
   }).join('') : `<div class="alert" style="border-color:rgba(46,158,107,.35);border-left-color:var(--money)"><span class="ico">✅</span><span class="txt">Остатков хватает — заказывать пока нечего.</span></div>`;
   const list=document.getElementById('stockList'); list.innerHTML='';
   S.ingredients.forEach(i=>{
@@ -172,9 +207,9 @@ function renderStock(){
     const thrPct=Math.max(0,Math.min(100, i.threshold/i.start*100));
     const lowc=i.stock<i.threshold?' low':'';
     const el=document.createElement('div'); el.className='ing'+lowc;
-    el.innerHTML=`<div class="top"><span class="nm">${i.name}</span><span class="val num">${fmt(i.stock)} ${i.unit}</span></div>
+    el.innerHTML=`<div class="top"><span class="nm">${esc(i.name)}</span><span class="val num">${fmt(i.stock)} ${esc(i.unit)}</span></div>
       <div class="bar"><div class="fill" style="width:${pct}%"></div><div class="thr" style="left:${thrPct}%"></div></div>
-      <div class="meta"><span>порог ${fmt(i.threshold)} ${i.unit}</span><span>себест. ${i.cost} сом/${i.unit}</span></div>
+      <div class="meta"><span>порог ${fmt(i.threshold)} ${esc(i.unit)}</span><span>себест. ${i.cost} сом/${esc(i.unit)}</span></div>
       <div class="stock-actions owner-only">
         <button data-stock="receipt" data-id="${i.id}">+ Приход</button>
         <button data-stock="writeoff" data-id="${i.id}">− Списание</button>
@@ -186,7 +221,7 @@ function renderStock(){
   const labels={sale:'Продажа',receipt:'Приход',writeoff:'Списание',inventory:'Инвентаризация'};
   labels.refund='Отмена продажи';
   const rows=[...S.movements].reverse().slice(0,10);
-  ledger.innerHTML=rows.length?rows.map(m=>`<div class="ledger-row"><time>${new Date(m.ts).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'})}</time><span>${labels[m.type]} · ${ing(m.ingredientId).name}${m.note?' · '+m.note:''}</span><b>${m.qty>0?'+':''}${fmt(m.qty)} ${ing(m.ingredientId).unit}</b></div>`).join(''):'<div class="muted">Движений пока нет</div>';
+  ledger.innerHTML=rows.length?rows.map(m=>{const ingredient=ing(m.ingredientId);return `<div class="ledger-row"><time>${new Date(m.ts).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'})}</time><span>${esc(labels[m.type]||m.type)} · ${esc(ingredient?.name||m.ingredientId)}${m.note?' · '+esc(m.note):''}</span><b>${m.qty>0?'+':''}${fmt(m.qty)} ${esc(ingredient?.unit||'')}</b></div>`;}).join(''):'<div class="muted">Движений пока нет</div>';
   applyRole();
 }
 function adjustStock(id,type){
@@ -197,8 +232,10 @@ function adjustStock(id,type){
   const qty=Number(String(raw).replace(',','.'));
   if(!Number.isFinite(qty)||qty<=0) return showToast('Количество не сохранено','Введи число больше нуля.');
   if(type==='writeoff'&&qty>i.stock) return showToast('Списание невозможно',`На складе только ${fmt(i.stock)} ${i.unit}.`);
-  const delta=type==='receipt'?qty:-qty; i.stock+=delta; addMovement(id,type,delta);
-  save(); renderStock(); showToast(type==='receipt'?'Приход сохранён':'Списание сохранено',`${i.name}: ${delta>0?'+':''}${fmt(delta)} ${i.unit}`);
+  const delta=type==='receipt'?qty:-qty;
+  const saved=transact(()=>{i.stock+=delta;addMovement(id,type,delta);});
+  if(!saved){renderStock();showToast('Операция не сохранена','Хранилище недоступно. Повтори операцию.');return;}
+  renderStock(); showToast(type==='receipt'?'Приход сохранён':'Списание сохранено',`${i.name}: ${delta>0?'+':''}${fmt(delta)} ${i.unit}`);
 }
 
 /* ---------- INVENTORY ---------- */
@@ -223,9 +260,9 @@ function renderInv(){
   const rows=S.ingredients.map(i=>{
     const actual=S.inventoryDraft.actual?.[i.id]??'';
     return `<tr data-id="${i.id}">
-      <td class="nm">${i.name}</td>
-      <td class="num">${fmt(snapshot[i.id])} ${i.unit}</td>
-      <td><input type="number" min="0" step="any" inputmode="numeric" value="${actual}" placeholder="—" aria-label="Фактический остаток: ${i.name}"> <span class="muted">${i.unit}</span></td>
+      <td class="nm">${esc(i.name)}</td>
+      <td class="num">${fmt(snapshot[i.id])} ${esc(i.unit)}</td>
+      <td><input type="number" min="0" step="any" inputmode="numeric" value="${actual}" placeholder="—" aria-label="Фактический остаток: ${esc(i.name)}"> <span class="muted">${esc(i.unit)}</span></td>
       <td class="varcell num">—</td>
       <td class="leakcell num">—</td>
     </tr>`;
@@ -239,8 +276,10 @@ function renderInv(){
 function startInventory(){
   if(S.role!=='owner'||inventoryInProgress()) return;
   const period=openPeriod();
-  S.inventoryDraft={periodId:period.id,startedAt:Date.now(),snapshot:createInventorySnapshot(S.ingredients),actual:{}};
-  save(); renderInv();
+  if(!transact(()=>{S.inventoryDraft={periodId:period.id,startedAt:Date.now(),snapshot:createInventorySnapshot(S.ingredients),actual:{}};})){
+    showToast('Инвентаризация не начата','Хранилище недоступно.');return;
+  }
+  renderInv();
   showToast('Инвентаризация начата','Продажи и складские операции приостановлены до завершения или отмены.');
 }
 function recalcInv(){
@@ -266,7 +305,7 @@ function recalcInv(){
     total+=leak;
   });
   S.inventoryDraft.actual=actualById;
-  save();
+  if(!save()) showToast('Черновик не сохранён','Проверь доступ к хранилищу браузера.');
   const tot=document.getElementById('invTotal');
   if(tot){tot.textContent=complete?fmt(total)+' сом':'Не проверено';tot.className='num '+(complete&&total===0?'var-ok':'var-leak');}
 }
@@ -287,19 +326,24 @@ function applyInv(){
     const i=ing(item.id);
     return {...item,name:i.name,unit:i.unit,diff:item.difference};
   });
-  const total=items.reduce((sum,item)=>sum+item.leak,0);
+  const total=roundMoney(items.reduce((sum,item)=>sum+item.leak,0));
   const period=openPeriod(); const closedAt=Date.now();
-  S.lastInventory={periodId:period.id,closedAt,items,total};
-  S.inventories.push(S.lastInventory);
-  items.forEach(item=>{ const delta=item.actual-item.theoretical; ing(item.id).stock=item.actual; if(delta) addMovement(item.id,'inventory',delta); });
-  period.closedAt=closedAt;
-  S.periods.push({id:Math.max(...S.periods.map(p=>p.id))+1,openedAt:closedAt,closedAt:null});
-  S.inventoryDraft=null;
-  save(); renderDash(); switchView('dash');
+  const inventoryId=makeId('inventory');
+  const saved=transact(()=>{
+    S.lastInventory={id:inventoryId,periodId:period.id,closedAt,items,total};
+    S.inventories.push(S.lastInventory);
+    items.forEach(item=>{const delta=item.actual-item.theoretical;ing(item.id).stock=item.actual;if(delta)addMovement(item.id,'inventory',delta,'',inventoryId);});
+    period.closedAt=closedAt;
+    S.periods.push({id:Math.max(...S.periods.map(p=>p.id))+1,openedAt:closedAt,closedAt:null});
+    S.inventoryDraft=null;
+  });
+  if(!saved){renderInv();showToast('Инвентаризация не закрыта','Хранилище недоступно.');return;}
+  renderDash(); switchView('dash');
 }
 function cancelInventory(){
   if(!inventoryInProgress()) return;
-  S.inventoryDraft=null; save(); switchView('kassa'); renderAll();
+  if(!transact(()=>{S.inventoryDraft=null;})){showToast('Отмена не сохранена','Хранилище недоступно.');return;}
+  switchView('kassa'); renderAll();
   showToast('Инвентаризация отменена','Продажи и складские операции снова доступны.');
 }
 function fillTheory(){ document.querySelectorAll('#invTable tbody tr').forEach(tr=>{tr.querySelector('input').value=Math.round(S.inventoryDraft.snapshot[tr.dataset.id]);}); recalcInv(); }
@@ -331,17 +375,21 @@ function renderDash(){
   }
   const items=S.lastInventory.items;
   const total=S.lastInventory.total;
+  const overageTotal=roundMoney(items.reduce((sum,item)=>sum+(item.overageValue||0),0));
   if(total>0){
     big.textContent='−'+fmt(total)+' сом'; big.className='big leak';
     const pctRev=rev?(total/rev*100):0;
-    exp.innerHTML=`Продано на <b>${fmt(rev)} сом</b>, честная себестоимость — <b>${fmt(cogs)} сом</b>. Но по факту склада не хватает ещё на <b>${fmt(total)} сом</b> — это <b>${pctRev.toFixed(1)}%</b> выручки, которые ушли мимо кассы (пролив, недолив, воровство). <b>Вот куда делись деньги.</b>`;
+    exp.innerHTML=`Продано на <b>${fmt(rev)} сом</b>, честная себестоимость — <b>${fmt(cogs)} сом</b>. Недостача составляет <b>${fmt(total)} сом</b> — это <b>${pctRev.toFixed(1)}%</b> выручки. Возможные причины: пролив, порча, ошибка учета или хищение.${overageTotal?` Излишек по другим позициям: <b>${fmt(overageTotal)} сом</b>.`:''}`;
+  }else if(overageTotal>0){
+    big.textContent='+'+fmt(overageTotal)+' сом';big.className='big ok';
+    exp.innerHTML=`Обнаружен излишек на <b>${fmt(overageTotal)} сом</b>. Проверь техкарты, поступления и предыдущий пересчет.`;
   }else{
     big.textContent='0 сом'; big.className='big ok';
     exp.innerHTML='Факт сходится с системой — <b>утечки нет</b>. Вся себестоимость ушла в проданные чашки.';
   }
   const max=Math.max(...items.map(x=>x.leak),1);
   bl.innerHTML=items.filter(x=>x.leak>0).sort((a,b)=>b.leak-a.leak).map(x=>
-    `<div class="brow"><span class="bn">${x.name}</span><div class="bbar"><span style="width:${x.leak/max*100}%"></span></div>
+    `<div class="brow"><span class="bn">${esc(x.name)}</span><div class="bbar"><span style="width:${x.leak/max*100}%"></span></div>
      <span class="bv">−${fmt(x.leak)} сом</span></div>`).join('') || '<div class="muted" style="font-size:14px">Утечки нет — всё сходится ✅</div>';
 }
 function renderPeriodHistory(){
@@ -365,7 +413,7 @@ function renderPeriodHistory(){
 
 /* ---------- shell ---------- */
 function switchView(v){
-  if(S.role==='barista'&&(v==='inv'||v==='dash')){ showToast('Раздел владельца','Бариста работает с кассой и видит остатки.'); v='kassa'; }
+  if(S.role==='barista'&&(v==='stock'||v==='inv'||v==='dash')){ showToast('Раздел владельца','Бариста работает только с кассой.'); v='kassa'; }
   document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
   document.querySelectorAll('.view').forEach(s=>s.classList.toggle('on', s.id==='v-'+v));
   if(v==='inv') renderInv(); if(v==='dash') renderDash(); if(v==='stock') renderStock(); if(v==='kassa') renderKassa();
@@ -375,11 +423,14 @@ function renderAll(){ renderKassa(); renderStock(); if(document.getElementById('
 function applyRole(){
   document.getElementById('role').value=S.role;
   document.querySelectorAll('.owner-only').forEach(el=>el.style.display=S.role==='owner'?'':'none');
-  document.querySelectorAll('.tabs button').forEach(b=>{ if(b.dataset.v==='inv'||b.dataset.v==='dash') b.style.display=S.role==='owner'?'':'none'; });
+  document.querySelectorAll('.tabs button').forEach(b=>{ if(b.dataset.v==='stock'||b.dataset.v==='inv'||b.dataset.v==='dash') b.style.display=S.role==='owner'?'':'none'; });
 }
 
 document.getElementById('tabs').addEventListener('click',e=>{const b=e.target.closest('button'); if(b) switchView(b.dataset.v);});
-document.getElementById('reset').onclick=()=>{ if(confirm('Сбросить демо к начальным данным?')){ S=SEED(); save(); switchView('kassa'); renderAll(); } };
+document.getElementById('reset').onclick=()=>{if(confirm('Сбросить демо к начальным данным?')){
+  if(!transact(()=>{S=SEED();})){showToast('Сброс не сохранён','Хранилище недоступно.');return;}
+  switchView('kassa');renderAll();
+}};
 document.getElementById('applyInv').onclick=applyInv;
 document.getElementById('startInv').onclick=startInventory;
 document.getElementById('fillTheory').onclick=fillTheory;
@@ -388,10 +439,10 @@ document.getElementById('cancelInv').onclick=cancelInventory;
 document.getElementById('undoSale').onclick=cancelLastSale;
 document.getElementById('role').onchange=e=>{
   const current=document.querySelector('.view.on')?.id.replace('v-','')||'kassa';
-  S.role=e.target.value;
-  save();
+  const nextRole=e.target.value;
+  if(!transact(()=>{S.role=nextRole;})){e.target.value=S.role;showToast('Роль не изменена','Хранилище недоступно.');return;}
   applyRole();
-  const protectedView=current==='inv'||current==='dash';
+  const protectedView=current==='stock'||current==='inv'||current==='dash';
   switchView(S.role==='barista'&&protectedView?'kassa':current);
   renderAll();
 };

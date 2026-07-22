@@ -3,10 +3,14 @@ function salesForPeriod(sales, periodId) {
   return sales.filter((sale) => sale.periodId === periodId && !sale.canceledAt);
 }
 
+function roundMoney(value) {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
 function calculateRevenue(sales, products, periodId) {
   const prices = new Map(products.map((product) => [product.id, product.price]));
-  return salesForPeriod(sales, periodId)
-    .reduce((total, sale) => total + (prices.get(sale.productId) ?? 0), 0);
+  return roundMoney(salesForPeriod(sales, periodId)
+    .reduce((total, sale) => total + (Number.isFinite(sale.unitPrice) ? sale.unitPrice : prices.get(sale.productId) ?? 0), 0));
 }
 
 function calculateCogs(sales, products, ingredients, periodId) {
@@ -19,8 +23,8 @@ function calculateCogs(sales, products, ingredients, periodId) {
     ),
   ]));
 
-  return salesForPeriod(sales, periodId)
-    .reduce((total, sale) => total + (productCosts.get(sale.productId) ?? 0), 0);
+  return roundMoney(salesForPeriod(sales, periodId)
+    .reduce((total, sale) => total + (Number.isFinite(sale.cogs) ? sale.cogs : productCosts.get(sale.productId) ?? 0), 0));
 }
 
 function findMissingIngredients(product, ingredients) {
@@ -37,13 +41,18 @@ function createInventorySnapshot(ingredients) {
   return Object.fromEntries(ingredients.map((ingredient) => [ingredient.id, ingredient.stock]));
 }
 
+function findLowStock(ingredients) {
+  return ingredients.filter((ingredient) => ingredient.stock < ingredient.threshold);
+}
+
 function calculateIngredientUsage(sales, products, periodId) {
   const productById = new Map(products.map((product) => [product.id, product]));
   const usage = {};
   salesForPeriod(sales, periodId).forEach((sale) => {
     const product = productById.get(sale.productId);
-    if (!product) return;
-    Object.entries(product.recipe).forEach(([ingredientId, quantity]) => {
+    const recipe = sale.recipeSnapshot ?? product?.recipe;
+    if (!recipe) return;
+    Object.entries(recipe).forEach(([ingredientId, quantity]) => {
       usage[ingredientId] = (usage[ingredientId] ?? 0) + quantity;
     });
   });
@@ -81,7 +90,10 @@ function calculateInventory(ingredients, actualById, theoreticalById = createInv
       theoretical,
       actual,
       difference,
-      leak: Math.max(0, difference) * ingredient.cost,
+      shortageValue: roundMoney(Math.max(0, difference) * ingredient.cost),
+      overageValue: roundMoney(Math.max(0, -difference) * ingredient.cost),
+      netValue: roundMoney(difference * ingredient.cost),
+      leak: roundMoney(Math.max(0, difference) * ingredient.cost),
     };
   });
 }
@@ -93,6 +105,8 @@ global.EsepDomain = {
   calculateRevenue,
   createInventorySnapshot,
   findMissingIngredients,
+  findLowStock,
+  roundMoney,
   salesForPeriod,
   simulateActualStock,
 };
