@@ -51,6 +51,8 @@
   .tile .pname{font-family:var(--display);font-weight:800;font-size:19px;margin-top:8px}
   .tile .price{color:var(--crema-deep);font-weight:700;font-size:16px;margin-top:2px;font-variant-numeric:tabular-nums}
   .tile .rc{color:var(--gray);font-size:11.5px;margin-top:9px;line-height:1.35;min-height:2.4em}
+  .tile .stock-status{display:inline-flex;margin-top:9px;padding:5px 8px;border-radius:8px;background:rgba(214,69,69,.11);
+    color:var(--leak);font-size:11.5px;font-weight:700;line-height:1.3}
 
   .cart{background:var(--espresso);color:var(--cream);border-radius:16px;padding:22px;position:sticky;top:84px}
   .cart h3{font-family:var(--display);font-weight:700;font-size:14px;letter-spacing:.5px;text-transform:uppercase;
@@ -119,6 +121,7 @@
   table.inv input{width:92px;text-align:right;padding:8px 10px;border:1px solid var(--line);border-radius:8px;
     font-family:var(--display);font-weight:700;font-variant-numeric:tabular-nums;font-size:15px;color:var(--espresso);background:#fff}
   table.inv input:focus{outline:2px solid var(--crema);border-color:var(--crema)}
+  table.inv input.invalid{border-color:var(--leak);outline:2px solid rgba(214,69,69,.2)}
   .var-ok{color:var(--money);font-weight:700} .var-leak{color:var(--leak);font-weight:700}
   tfoot td{font-family:var(--display);font-weight:800;font-size:16px;background:#faf7f2;border-top:2px solid var(--line)}
 
@@ -144,7 +147,10 @@
   .brow .bv{flex:none;width:110px;text-align:right;font-variant-numeric:tabular-nums;font-weight:700}
   .muted{color:var(--gray)}
   .hint{color:var(--gray);font-size:13px;margin-top:14px}
-  .table-scroll{max-width:100%;overflow-x:auto;border-radius:14px}
+  .table-scroll{max-width:100%;overflow-x:auto;border-radius:14px;-webkit-overflow-scrolling:touch;overscroll-behavior-inline:contain;
+    scrollbar-color:var(--crema) #efe7dd;scrollbar-width:thin}
+  .table-scroll::-webkit-scrollbar{height:8px}.table-scroll::-webkit-scrollbar-track{background:#efe7dd;border-radius:8px}
+  .table-scroll::-webkit-scrollbar-thumb{background:var(--crema);border-radius:8px}
   .history{margin-top:20px;background:#fff;border:1px solid var(--line);border-radius:14px;padding:20px 22px}
   .history h4{font-family:var(--display);font-size:15px;margin-bottom:12px}
   .history-row{display:grid;grid-template-columns:minmax(110px,1fr) repeat(3,auto);gap:16px;align-items:center;
@@ -173,7 +179,7 @@
     .reset{padding:8px 11px}.reset .full{display:none}.reset .short{display:inline}
     .tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-column:1/-1;width:100%;overflow:visible}
     .grid{grid-template-columns:1fr 1fr;gap:10px}
-    .tile{padding:14px}.tile .pname{font-size:16px}.tile .rc{display:none}
+    .tile{padding:14px}.tile .pname{font-size:16px}.tile .rc{display:none}.tile .stock-status{display:flex}
     .cart{padding:18px}.cart .rev{font-size:34px}
     .tabs button{min-width:0;padding-inline:4px;font-size:13px}
     .tabs .full{display:none}.tabs .short{display:inline}
@@ -183,7 +189,7 @@
     .stat{padding:14px}.stat .k{font-size:23px}
     .hero{padding:24px 20px}.brow .bn{width:86px}.brow .bv{width:88px}
     .ledger-row{grid-template-columns:1fr auto}.ledger-row time{grid-column:1/-1}
-    .history-row{grid-template-columns:1fr 1fr;gap:10px}
+    .history-row{grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;padding:12px;border:1px solid var(--line);border-radius:10px;background:#faf7f2}
     .history-row .metric{text-align:left}
   }
   @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}

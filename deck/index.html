@@ -123,6 +123,28 @@
     letter-spacing:-6px;line-height:.9;color:var(--espresso)}
   .demo-sub{font-size:clamp(18px,2.4vw,28px);color:var(--gray);margin-top:8px;max-width:36ch}
   .demo-big .dot{color:var(--crema)}
+  .demo-result{display:inline-flex;align-items:baseline;gap:10px;margin-top:24px;padding:14px 20px;border-radius:14px;
+    background:var(--espresso);color:var(--cream);font-family:var(--display);font-weight:800;font-size:clamp(24px,4vw,46px)}
+  .demo-result small{font:500 14px var(--body);color:var(--crema)}
+  .plan-badge{display:inline-flex;padding:6px 10px;border-radius:999px;background:rgba(224,164,88,.16);color:var(--crema-deep);
+    font:700 12px var(--display);letter-spacing:.8px;text-transform:uppercase}
+  .close-grid{display:grid;grid-template-columns:1fr auto;gap:34px;align-items:center;max-width:900px;margin-top:28px}
+  .qr-link{width:210px;display:flex;flex-direction:column;gap:8px;align-items:center;color:var(--crema-deep);
+    font:800 11px var(--display);text-align:center;text-decoration:none}
+  .qr-link img{display:block;width:210px;height:210px;border:10px solid #fff;border-radius:20px;box-shadow:0 8px 24px rgba(36,26,21,.12)}
+  .contact{margin-top:20px;font:700 16px var(--display);color:var(--espresso)}
+  .contact a{color:var(--crema-deep);text-decoration:none}
+  .metric-strip{display:flex;gap:10px;flex-wrap:wrap;margin-top:20px}
+  .metric-chip{background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px 14px;min-width:120px}
+  .metric-chip b{display:block;font:800 20px var(--display);color:var(--espresso)}
+  .metric-chip span{display:block;margin-top:2px;color:var(--gray);font-size:11px}
+  .team-plan{display:grid;grid-template-columns:.9fr 1.1fr;gap:34px;max-width:1040px;margin-top:22px}
+  .team-plan h3{font:800 18px var(--display);margin-bottom:10px}
+  .team-list,.plan-list{display:flex;flex-direction:column;gap:8px}
+  .member,.plan-item{background:#fff;border:1px solid var(--line);border-radius:12px;padding:11px 14px}
+  .member b,.plan-item b{display:block;font:700 14px var(--display)}
+  .member span,.plan-item span{display:block;color:var(--gray);font-size:12px;margin-top:2px;line-height:1.35}
+  .team-count{color:var(--crema-deep);font:800 30px var(--display);margin-bottom:10px}
 
   .roadmap{display:flex;flex-direction:column;gap:0;margin-top:30px;max-width:760px}
   .rm{display:flex;gap:20px;align-items:flex-start;padding:16px 0;border-bottom:1px solid var(--line)}
@@ -141,7 +163,7 @@
 
   @media (max-width:720px){
     .rail{width:56px} .stage{left:56px}
-    .cards{grid-template-columns:1fr} .loop{gap:8px}
+    .slide{overflow-y:auto}.cards{grid-template-columns:1fr}.loop{gap:8px}.team-plan,.close-grid{grid-template-columns:1fr}.qr-link{display:none}
   }
   @media (prefers-reduced-motion:reduce){
     .slide{transition:opacity .01s} .tick{transition:none}
@@ -201,7 +223,7 @@
         <div class="card leak"><div class="k num">~80%</div><div class="l">Закуп в нашем кейсе — в 4 раза выше нормы</div></div>
         <div class="card leak"><div class="k num">до 20%</div><div class="l">прибыли съедают потери; 75% усушки — воровство персонала</div></div>
       </div>
-      <p class="src">Владелец не может отличить: деньги лежат на складе или утекли. Эсеп разделяет — сколько ушло в чашки, сколько на полке, сколько украдено.</p>
+      <p class="src">Владелец не может отличить: деньги лежат на складе или утекли. Эсеп разделяет расход по продажам, остаток на полке и необъяснимое расхождение — без автоматических обвинений персонала.</p>
     </section>
 
     <!-- 4 -->
@@ -234,7 +256,13 @@
     <section class="slide" style="align-items:flex-start;justify-content:center">
       <div class="eyebrow">Живьём</div>
       <div class="demo-big">DEMO<span class="dot">.</span></div>
-      <div class="demo-sub">Продажа → авто-списание → сигнал → расхождение → дашборд. Кульминация: «Вот куда делись твои деньги. Больше не на глаз.»</div>
+      <div class="demo-sub"><b>Бариста:</b> касса и продажи → <b>Владелец:</b> склад, инвентаризация и дашборд.</div>
+      <div class="metric-strip">
+        <div class="metric-chip"><b>970 сом</b><span>выручка</span></div>
+        <div class="metric-chip"><b>259 сом</b><span>себестоимость</span></div>
+        <div class="metric-chip"><b>27%</b><span>food cost</span></div>
+        <div class="metric-chip"><b>≈ 22 сома</b><span>динамическая утечка</span></div>
+      </div>
     </section>
 
     <!-- 7 -->
@@ -247,7 +275,7 @@
           <tr><td>Цена</td><td>4 590–9 690 сом/мес</td><td>$14–59/мес</td><td class="us">Freemium</td></tr>
           <tr><td>Сложность</td><td class="no">под товароведа</td><td>широкий POS</td><td class="us">радикально простой</td></tr>
           <tr><td>Детектор утечки</td><td class="no">нет</td><td class="no">нет</td><td class="us yes">ядро продукта</td></tr>
-          <tr><td>Локальность</td><td>реселлеры</td><td>частично</td><td class="us">кыргызский · ГНС · WhatsApp</td></tr>
+          <tr><td>Роли</td><td>сложные права</td><td>широкая настройка</td><td class="us yes">бариста · владелец</td></tr>
         </tbody>
       </table>
       <p class="src">Существование Poster доказывает, что рынок есть — иностранцы не локализуют то, на что нет спроса. Наш ответ на «чем ты лучше Poster?» — не «дешевле», а «ими не пользуются, а мы делаем так, чтобы пользовались».</p>
@@ -258,22 +286,35 @@
       <div class="eyebrow">Бизнес-модель</div>
       <h2>Freemium: заходим кассой, зарабатываем на складе</h2>
       <div class="cards">
-        <div class="card"><div class="k">Бесплатно</div><div class="l">Касса — низкий барьер захода, рост базы</div></div>
-        <div class="card crema"><div class="k">Подписка</div><div class="l">Склад, аналитика, детектор утечки — где живёт боль</div></div>
+        <div class="card"><div class="k">Пилот</div><div class="l">Бесплатная неделя на реальных данных кофейни</div></div>
+        <div class="card crema"><div class="k num">2 600 сом</div><div class="l">Подписка за точку в месяц: склад, аналитика, детектор утечки</div></div>
         <div class="card money"><div class="k num">$72–100K</div><div class="l">SOM ARR за 2–3 года при 8–12% SAM</div></div>
       </div>
-      <p class="lead">Оплата в сомах, местная поддержка в WhatsApp. Моат — простота и близость, а не цена.</p>
+      <p class="lead">Оплата в сомах. Моат — ежедневная простота, прозрачный учет и быстрый результат, а не количество функций.</p>
     </section>
 
     <!-- 9 -->
     <section class="slide">
-      <div class="eyebrow">Роадмап</div>
-      <h2>От детектора утечки — к замку на клиента</h2>
-      <div class="roadmap">
-        <div class="rm"><div class="stage-n">01</div><div><div class="rt">Фискализация ГНС / онлайн-ККМ</div><div class="rd">Без неё кофейне нельзя работать — это регуляторный замок</div></div></div>
-        <div class="rm"><div class="stage-n">02</div><div><div class="rt">Приёмка накладных и поставщики</div><div class="rd">Замкнуть «факт закупа» — точнее считать утечку</div></div></div>
-        <div class="rm"><div class="stage-n">03</div><div><div class="rt">Мультиточка, роли, аналитика</div><div class="rd">Рост от одной кофейни к сети</div></div></div>
-        <div class="rm"><div class="stage-n">04</div><div><div class="rt">Бары и кафе с кухней</div><div class="rd">Расширение сегмента на том же движке простоты</div></div></div>
+      <div class="eyebrow">Команда и Roadmap</div>
+      <h2>3 человека. Один измеримый результат.</h2>
+      <div class="team-plan">
+        <div>
+          <div class="team-count">CODE-FORGE · 3 специалиста</div>
+          <div class="team-list">
+            <div class="member"><b>Ратмир · Питчер / Бизнес</b><span>Проблема, Customer Discovery, рынок, продуктовые решения и защита</span></div>
+            <div class="member"><b>Урмат · Продукт / Демо</b><span>Пользовательский сценарий, интерфейс и live demo</span></div>
+            <div class="member"><b>Салман · Аналитика / Техническая часть</b><span>Расчеты, учетная логика, тесты и надежность</span></div>
+          </div>
+        </div>
+        <div>
+          <h3><span class="plan-badge">Roadmap / Планы</span></h3>
+          <div class="plan-list">
+            <div class="plan-item"><b>Импорт из Poster / iiko</b><span>Получать продажи без замены текущей кассы</span></div>
+            <div class="plan-item"><b>Облачная синхронизация</b><span>Несколько устройств, резервное хранение и мультиточка</span></div>
+            <div class="plan-item"><b>Кыргызский язык и ГНС</b><span>Локализация и фискализация после пилота</span></div>
+            <div class="plan-item"><b>WhatsApp-отчёты</b><span>Сигналы закупки и расхождения владельцу</span></div>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -281,7 +322,22 @@
     <section class="slide" style="justify-content:center">
       <div class="logo-wm">эсеп<span class="dot"></span></div>
       <div class="tagline">Твои деньги — на виду</div>
-      <p class="lead" style="margin-top:34px">Я не гуглил эту проблему — я в ней работал. Соло + ИИ собрал рабочее демо за неделю.<br><br><b>Дайте кофейням наконец пользоваться тем, за что они платят.</b></p>
+      <div class="close-grid">
+        <div>
+          <div class="demo-result">≈ 22 сома <small>найдено за одну demo-смену</small></div>
+          <div class="metric-strip">
+            <div class="metric-chip"><b>970 сом</b><span>выручка</span></div>
+            <div class="metric-chip"><b>259 сом</b><span>себестоимость</span></div>
+            <div class="metric-chip"><b>27%</b><span>food cost</span></div>
+          </div>
+          <p class="lead"><b>Ищем 3 кофейни для пилота в Бишкеке.</b><br>Команда CODE-FORGE: Ратмир, Урмат и Салман превратили реальную боль кофейни в работающий MVP.</p>
+          <div class="contact">Демо: <a href="https://startup-lime-pi.vercel.app/app/index.html">startup-lime-pi.vercel.app</a><br>Код: <a href="https://github.com/urmat26/startup">github.com/urmat26/startup</a></div>
+        </div>
+        <a class="qr-link" href="https://startup-lime-pi.vercel.app/app/index.html" aria-label="Открыть демо Esep">
+          <img src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&amp;data=https%3A%2F%2Fstartup-lime-pi.vercel.app%2Fapp%2Findex.html" alt="QR-код демо Esep">
+          Открыть live demo
+        </a>
+      </div>
     </section>
 
   </main>
