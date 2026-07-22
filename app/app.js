@@ -37,6 +37,7 @@ const SEED = () => ({
   inventoryDraft:null,
 });
 const KEY='esep-demo-v2';
+const LEGACY_KEY='esep-demo-v1';
 let S=initializeState();
 const isFiniteNonNegative = value => Number.isFinite(value)&&value>=0;
 function validateState(state){
@@ -71,17 +72,45 @@ function validateState(state){
     return Math.abs(projected-ingredient.stock)<1e-7;
   });
 }
+function migrateLegacyState(legacy){
+  if(!legacy||!Array.isArray(legacy.ingredients)||!Array.isArray(legacy.products)||!Array.isArray(legacy.sales)) return null;
+  const products=new Map(legacy.products.map(product=>[product.id,product]));
+  const ingredients=new Map(legacy.ingredients.map(ingredient=>[ingredient.id,ingredient]));
+  const periods=Array.isArray(legacy.periods)&&legacy.periods.length?legacy.periods:[{id:1,openedAt:Date.now(),closedAt:null}];
+  const open=periods.find(period=>period.closedAt==null)||periods.at(-1);
+  if(!periods.some(period=>period.closedAt==null)) open.closedAt=null;
+  const sales=legacy.sales.map((sale,index)=>{
+    const product=products.get(sale.productId);
+    if(!product) return sale;
+    const recipeSnapshot=Object.fromEntries(Object.entries(product.recipe));
+    const cogs=roundMoney(Object.entries(recipeSnapshot).reduce((sum,[id,qty])=>sum+(ingredients.get(id)?.cost||0)*qty,0));
+    return {...sale,id:String(sale.id||`legacy-sale-${index}`),periodId:sale.periodId||open.id,productName:product.name,
+      unitPrice:product.price,cogs,recipeSnapshot};
+  });
+  const inventories=(Array.isArray(legacy.inventories)?legacy.inventories:legacy.lastInventory?[legacy.lastInventory]:[])
+    .map((inventory,index)=>({...inventory,id:String(inventory.id||`legacy-inventory-${index}`),total:roundMoney(inventory.total||0)}));
+  const lastInventory=legacy.lastInventory
+    ? inventories.find(inventory=>inventory.periodId===legacy.lastInventory.periodId)||inventories.at(-1)||null
+    : null;
+  return {...legacy,schemaVersion:2,role:legacy.role||'owner',periods,sales,
+    movements:(Array.isArray(legacy.movements)?legacy.movements:[]).map((event,index)=>({...event,id:String(event.id||`legacy-event-${index}`),periodId:event.periodId||open.id})),
+    inventories,lastInventory,inventoryDraft:legacy.inventoryDraft||null};
+}
 function initializeState(){
   try{
-    const raw=localStorage.getItem(KEY);
+    const current=localStorage.getItem(KEY);
+    const legacyRaw=current?null:localStorage.getItem(LEGACY_KEY);
+    const raw=current||legacyRaw;
     if(!raw){
       const state=SEED();
       localStorage.setItem(KEY,JSON.stringify(state));
       return state;
     }
-    const state=JSON.parse(raw);
+    const parsed=JSON.parse(raw);
+    const state=legacyRaw?migrateLegacyState(parsed):parsed;
     if(!validateState(state)) throw new TypeError('Invalid stored state');
     localStorage.setItem(KEY,JSON.stringify(state));
+    if(legacyRaw) localStorage.removeItem(LEGACY_KEY);
     return state;
   }catch(error){
     const state=SEED();
@@ -342,6 +371,7 @@ function applyInv(){
 }
 function cancelInventory(){
   if(!inventoryInProgress()) return;
+  if(!confirm('Отменить инвентаризацию? Введённые значения будут удалены.')) return;
   if(!transact(()=>{S.inventoryDraft=null;})){showToast('Отмена не сохранена','Хранилище недоступно.');return;}
   switchView('kassa'); renderAll();
   showToast('Инвентаризация отменена','Продажи и складские операции снова доступны.');
@@ -440,6 +470,11 @@ document.getElementById('undoSale').onclick=cancelLastSale;
 document.getElementById('role').onchange=e=>{
   const current=document.querySelector('.view.on')?.id.replace('v-','')||'kassa';
   const nextRole=e.target.value;
+  if(inventoryInProgress()&&nextRole==='barista'){
+    e.target.value='owner';
+    showToast('Роль не изменена','Сначала заверши или отмени текущую инвентаризацию.');
+    return;
+  }
   if(!transact(()=>{S.role=nextRole;})){e.target.value=S.role;showToast('Роль не изменена','Хранилище недоступно.');return;}
   applyRole();
   const protectedView=current==='stock'||current==='inv'||current==='dash';
