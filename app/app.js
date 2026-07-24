@@ -6,9 +6,11 @@ const {
   createInventorySnapshot,
   findLowStock,
   findMissingIngredients,
+  migrateLegacyState: migrateLegacyStateData,
   roundMoney,
   salesForPeriod,
   simulateActualStock,
+  validateState,
 } = globalThis.EsepDomain;
 
 const SEED = () => ({
@@ -38,88 +40,36 @@ const SEED = () => ({
 });
 const KEY='esep-demo-v2';
 const LEGACY_KEY='esep-demo-v1';
+const LEGACY_BACKUP_KEY='esep-demo-v1-backup';
 let S=initializeState();
-const isFiniteNonNegative = value => Number.isFinite(value)&&value>=0;
-function validateState(state){
-  if(!state||state.schemaVersion!==2||!Array.isArray(state.ingredients)||!Array.isArray(state.products)||!Array.isArray(state.sales)) return false;
-  const ingredientIds=new Set(state.ingredients.map(i=>i?.id));
-  const productIds=new Set(state.products.map(p=>p?.id));
-  if(ingredientIds.size!==state.ingredients.length||productIds.size!==state.products.length) return false;
-  if(!state.ingredients.every(i=>i&&typeof i.id==='string'&&typeof i.name==='string'&&typeof i.unit==='string'
-    &&isFiniteNonNegative(i.stock)&&isFiniteNonNegative(i.start)&&isFiniteNonNegative(i.threshold)&&isFiniteNonNegative(i.cost))) return false;
-  if(!state.products.every(p=>p&&typeof p.id==='string'&&typeof p.name==='string'&&isFiniteNonNegative(p.price)
-    &&p.recipe&&Object.entries(p.recipe).length>0&&Object.entries(p.recipe).every(([id,qty])=>ingredientIds.has(id)&&Number.isFinite(qty)&&qty>0))) return false;
-  if(state.role!=='owner'&&state.role!=='barista') return false;
-  if(!Array.isArray(state.periods)||state.periods.filter(p=>p&&p.closedAt==null).length!==1) return false;
-  const periodIds=new Set(state.periods.map(p=>p?.id));
-  if(periodIds.size!==state.periods.length||!state.periods.every(p=>p&&Number.isFinite(p.id)&&Number.isFinite(p.openedAt))) return false;
-  if(!Array.isArray(state.movements)||!Array.isArray(state.inventories)) return false;
-  if(new Set(state.sales.map(sale=>sale?.id)).size!==state.sales.length||new Set(state.movements.map(event=>event?.id)).size!==state.movements.length) return false;
-  if(!state.sales.every(sale=>sale&&typeof sale.id==='string'&&productIds.has(sale.productId)&&periodIds.has(sale.periodId)&&Number.isFinite(sale.ts)
-    &&(sale.canceledAt==null||Number.isFinite(sale.canceledAt))&&isFiniteNonNegative(sale.unitPrice)&&isFiniteNonNegative(sale.cogs)&&sale.recipeSnapshot
-    &&Object.entries(sale.recipeSnapshot).every(([id,qty])=>ingredientIds.has(id)&&Number.isFinite(qty)&&qty>0))) return false;
-  if(!state.movements.every(event=>event&&typeof event.id==='string'&&ingredientIds.has(event.ingredientId)&&periodIds.has(event.periodId)&&Number.isFinite(event.qty)&&Number.isFinite(event.ts))) return false;
-  if(!state.inventories.every(inventory=>inventory&&typeof inventory.id==='string'&&periodIds.has(inventory.periodId)&&Number.isFinite(inventory.closedAt)
-    &&Array.isArray(inventory.items)&&isFiniteNonNegative(inventory.total))) return false;
-  if(state.lastInventory&&!state.inventories.some(inventory=>inventory.id===state.lastInventory.id)) return false;
-  if(state.inventoryDraft){
-    if(!Number.isFinite(state.inventoryDraft.periodId)||!Number.isFinite(state.inventoryDraft.startedAt)||!state.inventoryDraft.snapshot) return false;
-    if(!state.ingredients.every(i=>isFiniteNonNegative(state.inventoryDraft.snapshot[i.id]))) return false;
-    if(state.inventoryDraft.actual&&!Object.values(state.inventoryDraft.actual).every(isFiniteNonNegative)) return false;
-  }
-  return state.ingredients.every(ingredient=>{
-    const projected=ingredient.start+state.movements.filter(event=>event.ingredientId===ingredient.id).reduce((sum,event)=>sum+event.qty,0);
-    return Math.abs(projected-ingredient.stock)<1e-7;
-  });
-}
 function migrateLegacyState(legacy){
-  if(!legacy||!Array.isArray(legacy.ingredients)||!Array.isArray(legacy.products)||!Array.isArray(legacy.sales)) return null;
-  const products=new Map(legacy.products.map(product=>[product.id,product]));
-  const ingredients=new Map(legacy.ingredients.map(ingredient=>[ingredient.id,ingredient]));
-  const periods=Array.isArray(legacy.periods)&&legacy.periods.length?legacy.periods:[{id:1,openedAt:Date.now(),closedAt:null}];
-  const open=periods.find(period=>period.closedAt==null)||periods.at(-1);
-  if(!periods.some(period=>period.closedAt==null)) open.closedAt=null;
-  const sales=legacy.sales.map((sale,index)=>{
-    const product=products.get(sale.productId);
-    if(!product) return sale;
-    const recipeSnapshot=Object.fromEntries(Object.entries(product.recipe));
-    const cogs=roundMoney(Object.entries(recipeSnapshot).reduce((sum,[id,qty])=>sum+(ingredients.get(id)?.cost||0)*qty,0));
-    return {...sale,id:String(sale.id||`legacy-sale-${index}`),periodId:sale.periodId||open.id,productName:product.name,
-      unitPrice:product.price,cogs,recipeSnapshot};
-  });
-  const inventories=(Array.isArray(legacy.inventories)?legacy.inventories:legacy.lastInventory?[legacy.lastInventory]:[])
-    .map((inventory,index)=>({...inventory,id:String(inventory.id||`legacy-inventory-${index}`),total:roundMoney(inventory.total||0)}));
-  const lastInventory=legacy.lastInventory
-    ? inventories.find(inventory=>inventory.periodId===legacy.lastInventory.periodId)||inventories.at(-1)||null
-    : null;
-  return {...legacy,schemaVersion:2,role:legacy.role||'owner',periods,sales,
-    movements:(Array.isArray(legacy.movements)?legacy.movements:[]).map((event,index)=>({...event,id:String(event.id||`legacy-event-${index}`),periodId:event.periodId||open.id})),
-    inventories,lastInventory,inventoryDraft:legacy.inventoryDraft||null};
+  return migrateLegacyStateData(legacy);
 }
 function initializeState(){
+  let legacyRaw=null;
   try{
     const current=localStorage.getItem(KEY);
-    const legacyRaw=current?null:localStorage.getItem(LEGACY_KEY);
-    const raw=current||legacyRaw;
-    if(!raw){
-      const state=SEED();
+    if(current){
+      const state=JSON.parse(current);
+      if(validateState(state)) return state;
+    }
+  }catch(error){}
+  try{
+    legacyRaw=localStorage.getItem(LEGACY_KEY);
+    if(legacyRaw){
+      localStorage.setItem(LEGACY_BACKUP_KEY,legacyRaw);
+      const state=migrateLegacyState(JSON.parse(legacyRaw));
+      if(!validateState(state)) throw new TypeError('Invalid migrated state');
       localStorage.setItem(KEY,JSON.stringify(state));
+      try{localStorage.removeItem(LEGACY_KEY);}catch(error){}
       return state;
     }
-    const parsed=JSON.parse(raw);
-    const state=legacyRaw?migrateLegacyState(parsed):parsed;
-    if(!validateState(state)) throw new TypeError('Invalid stored state');
-    localStorage.setItem(KEY,JSON.stringify(state));
-    if(legacyRaw) localStorage.removeItem(LEGACY_KEY);
-    return state;
   }catch(error){
-    const state=SEED();
-    try{
-      localStorage.removeItem(KEY);
-      localStorage.setItem(KEY,JSON.stringify(state));
-    }catch(removeError){}
-    return state;
+    return SEED();
   }
+  const state=SEED();
+  try{localStorage.setItem(KEY,JSON.stringify(state));}catch(error){}
+  return state;
 }
 function save(){try{if(!validateState(S))return false;localStorage.setItem(KEY,JSON.stringify(S));return true;}catch(error){return false;}}
 const cloneState=()=>JSON.parse(JSON.stringify(S));
@@ -166,7 +116,7 @@ function sell(p){
 }
 function cancelLastSale(){
   if(inventoryInProgress()) return showToast('Отмена приостановлена','Заверши или отмени текущую инвентаризацию.');
-  const sale=[...S.sales].reverse().find(x=>x.periodId===openPeriod().id&&!x.canceledAt);
+  const sale=[...S.sales].reverse().find(x=>x.periodId===openPeriod().id&&x.canceledAt==null);
   if(!sale) return showToast('Отменять нечего','В текущей смене нет активных продаж.');
   const product=S.products.find(p=>p.id===sale.productId);
   const recipe=sale.recipeSnapshot||product?.recipe;
@@ -299,8 +249,8 @@ function renderInv(){
   t.innerHTML=`<thead><tr><th>Ингредиент</th><th>По системе</th><th>Факт (насчитал)</th><th>Расхождение</th><th>≈ сом</th></tr></thead>
     <tbody>${rows}</tbody>
     <tfoot><tr><td colspan="4" style="text-align:right">Итого утечка за смену</td><td class="num" id="invTotal">—</td></tr></tfoot>`;
-  t.querySelectorAll('input').forEach(inp=>inp.addEventListener('input',recalcInv));
-  recalcInv();
+  t.querySelectorAll('input').forEach(inp=>inp.addEventListener('input',()=>recalcInv(true)));
+  recalcInv(false);
 }
 function startInventory(){
   if(S.role!=='owner'||inventoryInProgress()) return;
@@ -311,7 +261,7 @@ function startInventory(){
   renderInv();
   showToast('Инвентаризация начата','Продажи и складские операции приостановлены до завершения или отмены.');
 }
-function recalcInv(){
+function recalcInv(persist=false){
   let total=0,complete=true;
   const actualById={};
   document.querySelectorAll('#invTable tbody tr').forEach(tr=>{
@@ -333,8 +283,14 @@ function recalcInv(){
     leakcell.className='leakcell num '+(diff>0?'var-leak':'var-ok');
     total+=leak;
   });
-  S.inventoryDraft.actual=actualById;
-  if(!save()) showToast('Черновик не сохранён','Проверь доступ к хранилищу браузера.');
+  if(persist&&!transact(()=>{S.inventoryDraft.actual=actualById;})){
+    document.querySelectorAll('#invTable tbody tr').forEach(tr=>{
+      tr.querySelector('input').value=S.inventoryDraft.actual?.[tr.dataset.id]??'';
+    });
+    recalcInv(false);
+    showToast('Черновик не сохранён','Изменения отменены. Проверь доступ к хранилищу браузера.');
+    return;
+  }
   const tot=document.getElementById('invTotal');
   if(tot){tot.textContent=complete?fmt(total)+' сом':'Не проверено';tot.className='num '+(complete&&total===0?'var-ok':'var-leak');}
 }
@@ -376,14 +332,14 @@ function cancelInventory(){
   switchView('kassa'); renderAll();
   showToast('Инвентаризация отменена','Продажи и складские операции снова доступны.');
 }
-function fillTheory(){ document.querySelectorAll('#invTable tbody tr').forEach(tr=>{tr.querySelector('input').value=Math.round(S.inventoryDraft.snapshot[tr.dataset.id]);}); recalcInv(); }
+function fillTheory(){ document.querySelectorAll('#invTable tbody tr').forEach(tr=>{tr.querySelector('input').value=Math.round(S.inventoryDraft.snapshot[tr.dataset.id]);}); recalcInv(true); }
 function simLeak(){
   const usage=calculateIngredientUsage(S.sales,S.products,openPeriod().id);
   const actual=simulateActualStock(S.ingredients,S.inventoryDraft.snapshot,usage);
   document.querySelectorAll('#invTable tbody tr').forEach(tr=>{
     tr.querySelector('input').value=actual[tr.dataset.id];
   });
-  recalcInv();
+  recalcInv(true);
 }
 
 /* ---------- DASHBOARD ---------- */
