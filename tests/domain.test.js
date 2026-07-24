@@ -11,9 +11,11 @@ const {
   createInventorySnapshot,
   findLowStock,
   findMissingIngredients,
+  migrateLegacyState,
   roundMoney,
   salesForPeriod,
   simulateActualStock,
+  validateState,
 } = globalThis.EsepDomain;
 
 const ingredients = [
@@ -50,6 +52,13 @@ test('canceled sales are excluded from shift metrics', () => {
   assert.equal(salesForPeriod(canceled, 1).length, 1);
   assert.equal(calculateRevenue(canceled, products, 1), 90);
   assert.equal(calculateCogs(canceled, products, ingredients, 1), 31);
+});
+
+test('canceledAt zero is treated as a canceled sale', () => {
+  const canceled = [{ productId: 'esp', periodId: 1, canceledAt: 0 }];
+  assert.equal(salesForPeriod(canceled, 1).length, 0);
+  assert.equal(calculateRevenue(canceled, products, 1), 0);
+  assert.equal(calculateCogs(canceled, products, ingredients, 1), 0);
 });
 
 test('sale is blocked when any recipe ingredient is missing', () => {
@@ -157,4 +166,44 @@ test('hackathon demo scenario produces about 22 som leakage', () => {
   assert.equal(actual.syrup,973);
   assert.equal(actual.cocoa,400);
   assert.equal(total,22.04);
+});
+
+test('legacy v1 sales and completed inventory migrate into a valid balanced v2 state', () => {
+  const legacy={
+    ingredients:[
+      {id:'beans',name:'Зёрна',unit:'г',stock:1,start:20,threshold:5,cost:1.5},
+      {id:'cup',name:'Стаканы',unit:'шт',stock:1,start:2,threshold:1,cost:4},
+    ],
+    products:[{id:'esp',name:'Эспрессо',emoji:'☕',price:90,recipe:{beans:18,cup:1}}],
+    sales:[{productId:'esp',ts:100}],
+    inv:{snapshot:{beans:2,cup:1},actual:{beans:1,cup:1},completed:true},
+  };
+
+  const migrated=migrateLegacyState(legacy,200);
+  assert.equal(validateState(migrated),true);
+  assert.equal(migrated.schemaVersion,2);
+  assert.equal(migrated.sales[0].unitPrice,90);
+  assert.equal(migrated.sales[0].cogs,31);
+  assert.deepEqual(migrated.sales[0].recipeSnapshot,{beans:18,cup:1});
+  assert.equal(migrated.movements.find(event=>event.ingredientId==='beans').qty,-19);
+  assert.equal(migrated.movements.find(event=>event.ingredientId==='cup').qty,-1);
+  assert.equal(migrated.inventories.length,1);
+  assert.equal(migrated.inventories[0].total,1.5);
+  assert.equal(migrated.lastInventory.id,migrated.inventories[0].id);
+});
+
+test('state validation rejects an inventory with a forged total', () => {
+  const legacy={
+    ingredients:[
+      {id:'beans',name:'Зёрна',unit:'г',stock:1,start:1,threshold:1,cost:1.5},
+      {id:'cup',name:'Стаканы',unit:'шт',stock:1,start:1,threshold:1,cost:4},
+    ],
+    products:[{id:'esp',name:'Эспрессо',emoji:'☕',price:90,recipe:{beans:1,cup:1}}],
+    sales:[],
+    inv:{snapshot:{beans:2,cup:1},actual:{beans:1,cup:1},completed:true},
+  };
+  const state=migrateLegacyState(legacy,200);
+  assert.equal(validateState(state),true);
+  state.inventories[0].total=999;
+  assert.equal(validateState(state),false);
 });
