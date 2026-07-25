@@ -252,9 +252,9 @@
       <table>
         <thead><tr><th></th><th>iiko / R-Keeper</th><th>Poster</th><th>Эсеп</th></tr></thead>
         <tbody>
-          <tr><td>Цена</td><td>4 590–9 690 сом/мес</td><td>$14–59/мес</td><td class="us">Freemium</td></tr>
+          <tr><td>Цена</td><td>4 590–9 690 сом/мес</td><td>$14–59/мес</td><td class="us">Пилот + подписка</td></tr>
           <tr><td>Сложность</td><td class="no">под товароведа</td><td>широкий POS</td><td class="us">радикально простой</td></tr>
-          <tr><td>Детектор утечки</td><td class="no">нет</td><td class="no">нет</td><td class="us yes">ядро продукта</td></tr>
+          <tr><td>Расхождение</td><td>складской контур</td><td>склад и инвентаризация</td><td class="us yes">отдельный простой сценарий</td></tr>
           <tr><td>Роли</td><td>сложные права</td><td>широкая настройка</td><td class="us yes">бариста · владелец</td></tr>
         </tbody>
       </table>
@@ -264,7 +264,7 @@
     <!-- 6 -->
     <section class="slide">
       <div class="eyebrow">Бизнес-модель</div>
-      <h2>Freemium: заходим кассой, зарабатываем на складе</h2>
+      <h2>Бесплатный пилот,<br>затем подписка</h2>
       <div class="cards">
         <div class="card"><div class="k">Пилот</div><div class="l">Бесплатная неделя на реальных данных кофейни</div></div>
         <div class="card crema"><div class="k num">2 000 сом</div><div class="l">Подписка за точку в месяц: склад, аналитика, детектор утечки</div></div>
@@ -302,10 +302,10 @@
       <div class="tagline">Твои деньги — на виду</div>
       <div class="close-grid">
         <div>
-          <div class="demo-result">≈ 2200 сома <small>найдено за одну demo-смену</small></div>
+          <div class="demo-result">≈ 22 сома <small>найдено за одну демо-смену</small></div>
           <div class="metric-strip">
-            <div class="metric-chip"><b>1500 сом</b><span>выручка</span></div>
-            <div class="metric-chip"><b>450 сом</b><span>себестоимость</span></div>
+            <div class="metric-chip"><b>970 сом</b><span>выручка</span></div>
+            <div class="metric-chip"><b>259 сом</b><span>себестоимость</span></div>
             <div class="metric-chip"><b>27%</b><span>food cost</span></div>
           </div>
           <p class="lead"><b>Ищем 3 кофейни для пилота в Бишкеке.</b><br>Команда CODE-FORGE: Ратмир, Урмат и Салман превратили реальную боль кофейни в работающий MVP.</p>
@@ -321,7 +321,7 @@
   </main>
 
   <div class="foot">
-    <span class="counter" id="counter">01 / 10</span>
+    <span class="counter" id="counter">01 / 09</span>
     <div class="nav">
       <button id="prev" aria-label="Назад">‹</button>
       <button id="next" aria-label="Вперёд">›</button>
@@ -349,7 +349,7 @@
       t.classList.toggle('active',n===i);
       t.classList.toggle('done',n<i);
     });
-    counter.textContent=pad(i)+' / '+pad(slides.length-1);
+    counter.textContent=pad(i)+' / '+String(slides.length).padStart(2,'0');
   }
   function go(n){i=Math.max(0,Math.min(slides.length-1,n));render()}
   document.getElementById('next').onclick=()=>go(i+1);
