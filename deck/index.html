@@ -189,6 +189,7 @@
 
     <!-- 1 -->
     <section class="slide active">
+      <div class="eyebrow">CODE-FORGE · Startup Studio</div>
       <div class="logo-wm">эсеп<span class="dot"></span></div>
       <div class="tagline">Касса и склад для кофеен, которыми реально пользуются</div>
       <div class="money-hero" style="margin-top:48px">
@@ -205,70 +206,49 @@
     <!-- 2 -->
     <section class="slide">
       <div class="eyebrow">Проблема</div>
-      <h1>Функции учёта сложны —<br>поэтому ими не пользуются</h1>
+      <h1>Складской учёт сложен —<br>поэтому его откладывают</h1>
       <ul class="points">
-        <li><span class="tk"></span><span><b>Кассу</b> — используют. «Пробить заказ, отнести чек».</span></li>
-        <li><span class="tk"></span><span><b>Склад, техкарты, себестоимость</b> — мёртвый функционал.</span></li>
-        <li><span class="tk"></span><span>Между «пробить чек» и «вести склад» — <b>пропасть</b>, в которую проваливается вся ценность.</span></li>
+        <li><span class="tk"></span><span><b>Кассу</b> используют каждый день, потому что без неё нельзя провести продажу.</span></li>
+        <li><span class="tk"></span><span><b>Склад и техкарты</b> требуют настройки и постоянного контроля.</span></li>
+        <li><span class="tk"></span><span>Владелец не видит, что ушло в напитки, а что стало <b>необъяснимым расхождением</b>.</span></li>
       </ul>
-      <p class="src">iiko настраивает склад через техподдержку — им всё равно не пользуются. Проблема не в отсутствии функций, а в том, что ими невозможно пользоваться: UI под товароведа, которого в кофейне нет.</p>
+      <p class="src">Проблема не в отсутствии функций у существующих систем, а в сложности ежедневного складского сценария для небольшой команды.</p>
     </section>
 
     <!-- 3 -->
     <section class="slide">
-      <div class="eyebrow">Сколько это стоит</div>
-      <h2>Без учёта невозможно отличить<br>расход от утечки</h2>
-      <div class="cards">
-        <div class="card crema"><div class="k num">15–20%</div><div class="l">Нормальный food cost кофейни на напитках</div></div>
-        <div class="card leak"><div class="k num">~80%</div><div class="l">Закуп в нашем кейсе — в 4 раза выше нормы</div></div>
-        <div class="card leak"><div class="k num">до 20%</div><div class="l">прибыли съедают неучтённые потери — от пролива до хищения</div></div>
+      <div class="eyebrow">Решение</div>
+      <h2>Эсеп связывает продажу<br>со складом автоматически</h2>
+      <div class="loop">
+        <span class="step">Продал</span><span class="chev">→</span>
+        <span class="step">Само списалось</span><span class="chev">→</span>
+        <span class="step">Инвентаризация</span><span class="chev">→</span>
+        <span class="step hero">Разница в сомах</span>
       </div>
-      <p class="src">Владелец не может отличить: деньги лежат на складе или утекли. Эсеп разделяет расход по продажам, остаток на полке и необъяснимое расхождение — без автоматических обвинений персонала.</p>
+      <p class="lead">Бариста работает только с кассой. Владелец видит остатки, сигнал закупки и расхождение между расчётом и фактом.</p>
+      <div class="metric-strip">
+        <div class="metric-chip"><b>970 сом</b><span>выручка демо-смены</span></div>
+        <div class="metric-chip"><b>259 сом</b><span>себестоимость</span></div>
+        <div class="metric-chip"><b>≈ 22 сома</b><span>расхождение</span></div>
+      </div>
     </section>
 
     <!-- 4 -->
     <section class="slide">
-      <div class="eyebrow">Рынок</div>
-      <h2>Молодой рынок, растёт взрывом</h2>
+      <div class="eyebrow">Целевая аудитория</div>
+      <h2>Владелец небольшой кофейни<br>без отдельного товароведа</h2>
       <div class="cards">
-        <div class="card money"><div class="k num">+53%</div><div class="l">Общепит Бишкека за год: 2 247 → 3 440 (2ГИС, 2024)</div></div>
-        <div class="card crema"><div class="k num">×5</div><div class="l">Импорт кофе за 3 года. Потребление 1,36 кг/чел vs 4,85 в Казахстане</div></div>
-        <div class="card"><div class="k num">98%</div><div class="l">Проникновение интернета — инфраструктура под облако готова</div></div>
+        <div class="card crema"><div class="k">1 точка</div><div class="l">Небольшая кофейня в Бишкеке</div></div>
+        <div class="card"><div class="k">1–2 бариста</div><div class="l">Небольшая команда без специалиста по складу</div></div>
+        <div class="card money"><div class="k num">3 440</div><div class="l">Точек общепита в Бишкеке по данным 2ГИС за 2024 год</div></div>
       </div>
-      <p class="src">TAM ~$2,3M · SAM ~$0,83M · SOM ~$72–100K ARR/год (кофейни + малые кафе КР). Источники: 2ГИС / economist.kg, Нацстатком / kaktus.media, 24.kg.</p>
+      <p class="src">Начинаем с трёх пилотов в Бишкеке и проверяем ценность продукта на реальных данных.</p>
     </section>
 
     <!-- 5 -->
     <section class="slide">
-      <div class="eyebrow">Решение</div>
-      <h2>Склад ведёт себя сам</h2>
-      <div class="loop">
-        <span class="step">Продал</span><span class="chev">→</span>
-        <span class="step">Само списалось</span><span class="chev">→</span>
-        <span class="step">Остаток</span><span class="chev">→</span>
-        <span class="step">Сигнал закупки</span><span class="chev">→</span>
-        <span class="step hero">Расхождение = утечка</span>
-      </div>
-      <p class="lead">Бариста не делает ничего лишнего — списание это <b>побочный эффект продажи</b>. А владелец впервые видит, куда уходят деньги: расчётный остаток против фактического, разница — в сомах.</p>
-    </section>
-
-    <!-- 6 -->
-    <section class="slide" style="align-items:flex-start;justify-content:center">
-      <div class="eyebrow">Живьём</div>
-      <div class="demo-big">DEMO<span class="dot">.</span></div>
-      <div class="demo-sub"><b>Бариста:</b> касса и продажи → <b>Владелец:</b> склад, инвентаризация и дашборд.</div>
-      <div class="metric-strip">
-        <div class="metric-chip"><b>970 сом</b><span>выручка</span></div>
-        <div class="metric-chip"><b>259 сом</b><span>себестоимость</span></div>
-        <div class="metric-chip"><b>27%</b><span>food cost</span></div>
-        <div class="metric-chip"><b>≈ 22 сома</b><span>динамическая утечка</span></div>
-      </div>
-    </section>
-
-    <!-- 7 -->
-    <section class="slide">
-      <div class="eyebrow">Почему не Poster / iiko</div>
-      <h2>Они дали функции. Мы даём использование.</h2>
+      <div class="eyebrow">Анализ конкурентов</div>
+      <h2>Не больше функций,<br>а короче ежедневный сценарий</h2>
       <table>
         <thead><tr><th></th><th>iiko / R-Keeper</th><th>Poster</th><th>Эсеп</th></tr></thead>
         <tbody>
@@ -278,48 +258,47 @@
           <tr><td>Роли</td><td>сложные права</td><td>широкая настройка</td><td class="us yes">бариста · владелец</td></tr>
         </tbody>
       </table>
-      <p class="src">Существование Poster доказывает, что рынок есть — иностранцы не локализуют то, на что нет спроса. Наш ответ на «чем ты лучше Poster?» — не «дешевле», а «ими не пользуются, а мы делаем так, чтобы пользовались».</p>
+      <p class="src">Poster и iiko закрывают широкий ресторанный контур. Эсеп фокусируется на коротком складском сценарии небольшой кофейни.</p>
     </section>
 
-    <!-- 8 -->
+    <!-- 6 -->
     <section class="slide">
       <div class="eyebrow">Бизнес-модель</div>
       <h2>Freemium: заходим кассой, зарабатываем на складе</h2>
       <div class="cards">
         <div class="card"><div class="k">Пилот</div><div class="l">Бесплатная неделя на реальных данных кофейни</div></div>
         <div class="card crema"><div class="k num">2 600 сом</div><div class="l">Подписка за точку в месяц: склад, аналитика, детектор утечки</div></div>
-        <div class="card money"><div class="k num">$72–100K</div><div class="l">SOM ARR за 2–3 года при 8–12% SAM</div></div>
+        <div class="card money"><div class="k num">$72–100K в год</div><div class="l">Оценка выручки при 200–280 платных точках за 2–3 года</div></div>
       </div>
       <p class="lead">Оплата в сомах. Моат — ежедневная простота, прозрачный учет и быстрый результат, а не количество функций.</p>
     </section>
 
-    <!-- 9 -->
+    <!-- 7 -->
     <section class="slide">
-      <div class="eyebrow">Команда и Roadmap</div>
-      <h2>3 человека. Один измеримый результат.</h2>
-      <div class="team-plan">
-        <div>
-          <div class="team-count">CODE-FORGE · 3 специалиста</div>
-          <div class="team-list">
-            <div class="member"><b>Ратмир · Питчер / Бизнес</b><span>Проблема, Customer Discovery, рынок, продуктовые решения и защита</span></div>
-            <div class="member"><b>Урмат · Продукт / Демо</b><span>Пользовательский сценарий, интерфейс и live demo</span></div>
-            <div class="member"><b>Салман · Аналитика / Техническая часть</b><span>Расчеты, учетная логика, тесты и надежность</span></div>
-          </div>
-        </div>
-        <div>
-          <h3><span class="plan-badge">Roadmap / Планы</span></h3>
-          <div class="plan-list">
-            <div class="plan-item"><b>Импорт из Poster / iiko</b><span>Получать продажи без замены текущей кассы</span></div>
-            <div class="plan-item"><b>Облачная синхронизация</b><span>Несколько устройств, резервное хранение и мультиточка</span></div>
-            <div class="plan-item"><b>Кыргызский язык и ГНС</b><span>Локализация и фискализация после пилота</span></div>
-            <div class="plan-item"><b>WhatsApp-отчёты</b><span>Сигналы закупки и расхождения владельцу</span></div>
-          </div>
-        </div>
+      <div class="eyebrow">Дорожная карта</div>
+      <h2>От работающего MVP<br>к реальным кофейням</h2>
+      <div class="roadmap">
+        <div class="rm"><div class="stage-n">01</div><div><div class="rt">3 пилота в Бишкеке</div><div class="rd">Проверить ценность, цену и ежедневный сценарий на реальных данных</div></div></div>
+        <div class="rm"><div class="stage-n">02</div><div><div class="rt">Импорт из Poster / iiko</div><div class="rd">Получать продажи без замены действующей кассы</div></div></div>
+        <div class="rm"><div class="stage-n">03</div><div><div class="rt">Облако и мультиточка</div><div class="rd">Синхронизация устройств, резервное хранение и несколько точек</div></div></div>
+        <div class="rm"><div class="stage-n">04</div><div><div class="rt">Кыргызский язык, ГНС и WhatsApp</div><div class="rd">Локализация, фискализация и отчёты владельцу после пилотов</div></div></div>
       </div>
     </section>
 
-    <!-- 10 -->
+    <!-- 8 -->
+    <section class="slide">
+      <div class="eyebrow">Команда</div>
+      <h2>CODE-FORGE · 3 человека</h2>
+      <div class="cards">
+        <div class="card"><div class="k">Ратмир</div><div class="l">Бизнес-гипотезы, Customer Discovery, продуктовые решения и защита</div></div>
+        <div class="card crema"><div class="k">Урмат</div><div class="l">Продукт, пользовательский сценарий, интерфейс и live demo</div></div>
+        <div class="card money"><div class="k">Салман</div><div class="l">Расчёты, учётная логика, тесты и техническая надёжность</div></div>
+      </div>
+    </section>
+
+    <!-- 9 -->
     <section class="slide" style="justify-content:center">
+      <div class="eyebrow">Контакты</div>
       <div class="logo-wm">эсеп<span class="dot"></span></div>
       <div class="tagline">Твои деньги — на виду</div>
       <div class="close-grid">
