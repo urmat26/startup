@@ -8,8 +8,95 @@
 <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
-<div class="topbar">
-  <div class="brand">эсеп<span class="dot"></span><small>демо-кофейня</small></div>
+<div class="auth-loading" id="authLoading">
+  <div class="auth-loading-mark">эсеп<span></span></div>
+  <div>Загружаем кофейню…</div>
+</div>
+
+<main class="auth-shell" id="authShell" hidden>
+  <section class="auth-story">
+    <a class="auth-brand" href="../">эсеп<span></span></a>
+    <div class="auth-promise">
+      <div class="eyebrow">Учёт без догадок</div>
+      <h1>Твои деньги<br>на виду.</h1>
+      <p>Продажи, остатки и расхождения кофейни в одном простом рабочем пространстве.</p>
+    </div>
+    <div class="auth-proof"><b>Продал → склад списался сам</b><span>Эсеп показывает, что осталось и где возникло расхождение.</span></div>
+  </section>
+  <section class="auth-panel">
+    <div class="auth-card">
+      <div class="auth-view" id="authLogin">
+        <div class="eyebrow">С возвращением</div>
+        <h2>Войти в Эсеп</h2>
+        <p class="auth-intro">Продолжи работу со своей кофейней.</p>
+        <form class="auth-form" id="loginForm">
+          <label>Email<input name="email" type="email" autocomplete="email" required placeholder="you@example.com"></label>
+          <label>Пароль<input name="password" type="password" autocomplete="current-password" minlength="8" required placeholder="Минимум 8 символов"></label>
+          <div class="auth-error" data-auth-error aria-live="polite"></div>
+          <div class="auth-success" data-auth-success aria-live="polite"></div>
+          <button class="auth-submit" type="submit">Войти</button>
+        </form>
+        <button class="resend-button" id="resendConfirmation" type="button" hidden>Отправить письмо ещё раз</button>
+        <button class="text-button" type="button" data-auth-view="forgot">Забыли пароль?</button>
+        <div class="auth-switch">Нет аккаунта? <button type="button" data-auth-view="signup">Создать</button></div>
+      </div>
+
+      <div class="auth-view" id="authSignup" hidden>
+        <div class="eyebrow">Начало работы</div>
+        <h2>Создать аккаунт</h2>
+        <p class="auth-intro">Сначала зарегистрируем владельца, затем настроим кофейню.</p>
+        <form class="auth-form" id="signupForm">
+          <label>Ваше имя<input name="fullName" type="text" autocomplete="name" minlength="2" maxlength="100" required placeholder="Например, Ратмир"></label>
+          <label>Email<input name="email" type="email" autocomplete="email" required placeholder="you@example.com"></label>
+          <label>Пароль<input name="password" type="password" autocomplete="new-password" minlength="8" required placeholder="Минимум 8 символов"></label>
+          <div class="auth-error" data-auth-error aria-live="polite"></div>
+          <button class="auth-submit" type="submit">Продолжить</button>
+        </form>
+        <div class="auth-switch">Уже есть аккаунт? <button type="button" data-auth-view="login">Войти</button></div>
+      </div>
+
+      <div class="auth-view" id="authForgot" hidden>
+        <div class="eyebrow">Восстановление</div>
+        <h2>Сбросить пароль</h2>
+        <p class="auth-intro">Отправим ссылку для создания нового пароля.</p>
+        <form class="auth-form" id="forgotForm">
+          <label>Email<input name="email" type="email" autocomplete="email" required placeholder="you@example.com"></label>
+          <div class="auth-error" data-auth-error aria-live="polite"></div>
+          <div class="auth-success" data-auth-success aria-live="polite"></div>
+          <button class="auth-submit" type="submit">Отправить ссылку</button>
+        </form>
+        <button class="text-button back" type="button" data-auth-view="login">← Вернуться ко входу</button>
+      </div>
+
+      <div class="auth-view" id="authUpdatePassword" hidden>
+        <div class="eyebrow">Новый пароль</div>
+        <h2>Защитите аккаунт</h2>
+        <p class="auth-intro">Введите новый пароль для входа.</p>
+        <form class="auth-form" id="updatePasswordForm">
+          <label>Новый пароль<input name="password" type="password" autocomplete="new-password" minlength="8" required placeholder="Минимум 8 символов"></label>
+          <div class="auth-error" data-auth-error aria-live="polite"></div>
+          <button class="auth-submit" type="submit">Сохранить пароль</button>
+        </form>
+      </div>
+
+      <div class="auth-view" id="authOnboarding" hidden>
+        <div class="step">Шаг 1 из 1</div>
+        <h2>Настроим кофейню</h2>
+        <p class="auth-intro">Эти названия можно будет изменить позже.</p>
+        <form class="auth-form" id="onboardingForm">
+          <label>Название кофейни<input name="businessName" type="text" minlength="2" maxlength="100" required placeholder="Например, Точка кофе"></label>
+          <label>Первая точка<input name="locationName" type="text" minlength="2" maxlength="100" required value="Главная точка"></label>
+          <div class="auth-error" data-auth-error aria-live="polite"></div>
+          <button class="auth-submit" type="submit">Создать рабочее пространство</button>
+        </form>
+        <button class="text-button back" id="onboardingSignOut" type="button">Выйти из аккаунта</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div class="topbar app-shell" hidden>
+  <div class="brand">эсеп<span class="dot"></span><small id="locationName">Точка</small></div>
   <nav class="tabs" id="tabs">
     <button data-v="kassa" class="on"><span class="full">Касса</span><span class="short">Касса</span></button>
     <button data-v="stock"><span class="full">Склад</span><span class="short">Склад</span></button>
@@ -17,14 +104,24 @@
     <button data-v="dash"><span class="full">Дашборд</span><span class="short">Итоги</span></button>
   </nav>
   <div class="spacer"></div>
-  <select class="role" id="role" aria-label="Роль">
-    <option value="owner">Владелец</option>
-    <option value="barista">Бариста</option>
-  </select>
-  <button class="reset" id="reset"><span class="full">Сбросить демо</span><span class="short">Сброс</span></button>
+  <div class="account">
+    <button class="account-toggle" id="accountToggle" type="button" aria-expanded="false" aria-controls="accountMenu">
+      <span class="avatar" aria-hidden="true">Э</span>
+      <span class="account-copy"><b id="businessName">Кофейня</b><small id="roleLabel">Владелец</small></span>
+      <span class="chevron" aria-hidden="true">⌄</span>
+    </button>
+    <div class="account-menu" id="accountMenu" hidden>
+      <div class="account-identity"><b id="profileName">Пользователь</b><span id="profileEmail"></span></div>
+      <div class="account-note">Роль и доступ назначаются владельцем кофейни.</div>
+      <button class="menu-action owner-only" id="manageTeam" type="button">Сотрудники</button>
+      <button class="menu-action owner-only" id="manageCatalog" type="button">Меню и техкарты</button>
+      <button class="reset owner-only" id="reset" type="button">Сбросить демо-данные</button>
+      <button class="sign-out" id="signOut" type="button">Выйти</button>
+    </div>
+  </div>
 </div>
 
-<div class="wrap">
+<div class="wrap app-shell" hidden>
   <section class="view on" id="v-kassa">
     <h2 class="title">Касса</h2>
     <div class="sub">Тапни по напитку — продажа фиксируется, а ингредиенты списываются со склада сами.</div>
@@ -93,7 +190,120 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite"><div class="t1" id="toastT1"></div><div class="t2" id="toastT2"></div></div>
 
+<dialog class="modal" id="stockModal" aria-labelledby="stockModalTitle">
+  <form class="modal-card" id="stockForm">
+    <div class="modal-head">
+      <div>
+        <div class="eyebrow" id="stockModalEyebrow">Операция со складом</div>
+        <h2 id="stockModalTitle">Приход</h2>
+      </div>
+      <button class="icon-btn" id="stockModalClose" type="button" aria-label="Закрыть">×</button>
+    </div>
+    <div class="field">
+      <label for="stockQuantity">Количество <span id="stockUnit"></span></label>
+      <input id="stockQuantity" name="quantity" type="number" min="0" step="any" inputmode="decimal" required autocomplete="off">
+      <div class="field-error" id="stockQuantityError" aria-live="polite"></div>
+    </div>
+    <div class="field" id="stockReasonField">
+      <label for="stockReason">Причина</label>
+      <select id="stockReason" name="reason">
+        <option value="">Выберите причину</option>
+        <option value="Порча">Порча</option>
+        <option value="Пролив">Пролив</option>
+        <option value="Брак">Брак</option>
+        <option value="Истёк срок годности">Истёк срок годности</option>
+        <option value="Другое">Другое</option>
+      </select>
+      <div class="field-error" id="stockReasonError" aria-live="polite"></div>
+    </div>
+    <div class="field">
+      <label for="stockComment">Комментарий <span class="optional">необязательно</span></label>
+      <textarea id="stockComment" name="comment" rows="3" maxlength="160" placeholder="Например, поставщик или подробности списания"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn ghost" id="stockModalCancel" type="button">Отмена</button>
+      <button class="btn primary" id="stockSubmit" type="submit">Сохранить приход</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog class="modal team-modal" id="teamModal" aria-labelledby="teamModalTitle">
+  <div class="modal-card">
+    <div class="modal-head">
+      <div><div class="eyebrow">Доступ к кофейне</div><h2 id="teamModalTitle">Сотрудники</h2></div>
+      <button class="icon-btn" id="teamModalClose" type="button" aria-label="Закрыть">×</button>
+    </div>
+    <div class="team-list" id="teamList"><div class="muted">Загружаем команду…</div></div>
+    <form class="invite-form" id="inviteForm">
+      <h3>Пригласить бариста</h3>
+      <p>Создай одноразовую ссылку и отправь её сотруднику. Она действует 7 дней.</p>
+      <div class="invite-row">
+        <input name="email" type="email" required autocomplete="email" placeholder="barista@example.com" aria-label="Email бариста">
+        <button class="btn primary" type="submit">Создать ссылку</button>
+      </div>
+      <div class="auth-error" data-team-error aria-live="polite"></div>
+    </form>
+    <div class="invite-link" id="inviteLinkBox" hidden>
+      <label for="inviteLink">Ссылка готова</label>
+      <div class="invite-row"><input id="inviteLink" type="text" readonly><button class="btn" id="copyInvite" type="button">Копировать</button></div>
+      <small>Ссылка показывается только сейчас. При необходимости создай новую.</small>
+    </div>
+  </div>
+</dialog>
+
+<dialog class="modal catalog-modal" id="catalogModal" aria-labelledby="catalogModalTitle">
+  <div class="modal-card">
+    <div class="modal-head">
+      <div><div class="eyebrow">Настройки точки</div><h2 id="catalogModalTitle">Меню и техкарты</h2></div>
+      <button class="icon-btn" id="catalogModalClose" type="button" aria-label="Закрыть">×</button>
+    </div>
+    <div class="catalog-tabs" id="catalogTabs">
+      <button class="on" type="button" data-catalog-view="products">Товары</button>
+      <button type="button" data-catalog-view="ingredients">Ингредиенты</button>
+    </div>
+    <section class="catalog-view" id="catalogProducts">
+      <div class="catalog-heading"><p>Цена и состав каждого товара.</p><button class="btn" id="addProduct" type="button">+ Товар</button></div>
+      <div class="catalog-list" id="catalogProductList"></div>
+    </section>
+    <section class="catalog-view" id="catalogIngredients" hidden>
+      <div class="catalog-heading"><p>Единицы, себестоимость и порог закупки.</p><button class="btn" id="addIngredient" type="button">+ Ингредиент</button></div>
+      <div class="catalog-list" id="catalogIngredientList"></div>
+    </section>
+
+    <form class="catalog-form" id="ingredientForm" hidden>
+      <input name="id" type="hidden"><h3 id="ingredientFormTitle">Ингредиент</h3>
+      <div class="form-grid">
+        <label>Название<input name="name" required maxlength="100"></label>
+        <label>Код<input name="code" required pattern="[a-z0-9_-]+" placeholder="milk"></label>
+        <label>Единица<input name="unit" required maxlength="12" placeholder="мл"></label>
+        <label id="openingStockField">Начальный остаток<input name="stock" type="number" min="0" step="any" value="0" required></label>
+        <label>Порог закупки<input name="threshold" type="number" min="0" step="any" required></label>
+        <label>Себестоимость за единицу<input name="cost" type="number" min="0" step="any" required></label>
+      </div>
+      <div class="auth-error" data-catalog-error aria-live="polite"></div>
+      <div class="catalog-form-actions"><button class="btn ghost" data-close-catalog-form type="button">Отмена</button><button class="btn primary" type="submit">Сохранить</button></div>
+    </form>
+
+    <form class="catalog-form" id="productForm" hidden>
+      <input name="id" type="hidden"><h3 id="productFormTitle">Товар</h3>
+      <div class="form-grid product-fields">
+        <label>Название<input name="name" required maxlength="100"></label>
+        <label>Код<input name="code" required pattern="[a-z0-9_-]+" placeholder="latte"></label>
+        <label>Эмодзи<input name="emoji" maxlength="12" placeholder="☕"></label>
+        <label>Цена, сом<input name="price" type="number" min="0" step="0.01" required></label>
+      </div>
+      <h4>Техкарта</h4>
+      <div class="recipe-editor" id="recipeEditor"></div>
+      <div class="auth-error" data-catalog-error aria-live="polite"></div>
+      <div class="catalog-form-actions"><button class="btn ghost" data-close-catalog-form type="button">Отмена</button><button class="btn primary" type="submit">Сохранить товар</button></div>
+    </form>
+  </div>
+</dialog>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
 <script src="./domain.js" defer></script>
 <script src="./app.js" defer></script>
+<script src="./supabase-client.js" defer></script>
+<script src="./auth.js" defer></script>
 </body>
 </html>

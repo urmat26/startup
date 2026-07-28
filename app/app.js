@@ -42,6 +42,7 @@ const KEY='esep-demo-v2';
 const LEGACY_KEY='esep-demo-v1';
 const LEGACY_BACKUP_KEY='esep-demo-v1-backup';
 let S=initializeState();
+let cloudContext=null;
 function migrateLegacyState(legacy){
   return migrateLegacyStateData(legacy);
 }
@@ -94,7 +95,16 @@ const addMovement = (ingredientId,type,qty,note='',sourceId=null) => S.movements
 });
 
 /* ---------- KASSA ---------- */
-function sell(p){
+async function sell(p){
+  if(cloudContext){
+    const button=[...document.querySelectorAll('.tile')].find(tile=>tile.dataset.productId===p.id);
+    if(button) button.disabled=true;
+    const {error}=await globalThis.EsepSupabase.rpc('record_sale',{target_product_id:p.id});
+    if(error){if(button)button.disabled=false;showToast('Продажа не сохранена',cloudError(error));return;}
+    await reloadCloudLocation();
+    showToast(`${p.name} · ${p.price} сом`,'Продажа и списание сохранены в облаке.');
+    return;
+  }
   if(inventoryInProgress()) return showToast('Продажа приостановлена','Заверши или отмени текущую инвентаризацию.');
   const missing=findMissingIngredients(p,S.ingredients).map(({ingredient,qty})=>({i:ingredient,q:qty}));
   if(missing.length){
@@ -114,10 +124,18 @@ function sell(p){
   const ded = Object.entries(p.recipe).map(([k,q])=>`−${q} ${ing(k).unit} ${ing(k).name.toLowerCase()}`).join(' · ');
   showToast(`${p.name} · ${p.price} сом`, ded);
 }
-function cancelLastSale(){
+async function cancelLastSale(){
   if(inventoryInProgress()) return showToast('Отмена приостановлена','Заверши или отмени текущую инвентаризацию.');
   const sale=[...S.sales].reverse().find(x=>x.periodId===openPeriod().id&&x.canceledAt==null);
   if(!sale) return showToast('Отменять нечего','В текущей смене нет активных продаж.');
+  if(cloudContext){
+    const button=document.getElementById('undoSale');button.disabled=true;
+    const {error}=await globalThis.EsepSupabase.rpc('cancel_sale',{target_sale_id:sale.id});
+    if(error){button.disabled=false;showToast('Продажа не отменена',cloudError(error));return;}
+    await reloadCloudLocation();
+    showToast('Продажа отменена','Ингредиенты возвращены на облачный склад.');
+    return;
+  }
   const product=S.products.find(p=>p.id===sale.productId);
   const recipe=sale.recipeSnapshot||product?.recipe;
   if(!recipe) return showToast('Продажа не отменена','Состав исходной продажи не найден.');
@@ -146,6 +164,7 @@ function renderKassa(){
   menu.innerHTML='';
   S.products.forEach(p=>{
     const b=document.createElement('button'); b.className='tile';
+    b.dataset.productId=p.id;
     const missing=findMissingIngredients(p,S.ingredients).map(({ingredient})=>ingredient.name);
     b.disabled=missing.length>0;
     b.title=missing.length?`Не хватает: ${missing.join(', ')}`:'';
@@ -206,15 +225,143 @@ function renderStock(){
 function adjustStock(id,type){
   if(S.role!=='owner') return showToast('Недостаточно прав','Приход и списание доступны владельцу.');
   if(inventoryInProgress()) return showToast('Склад заблокирован','Заверши или отмени текущую инвентаризацию.');
-  const i=ing(id); const raw=prompt(`${type==='receipt'?'Приход':'Списание'}: ${i.name}, ${i.unit}`);
-  if(raw===null) return;
-  const qty=Number(String(raw).replace(',','.'));
-  if(!Number.isFinite(qty)||qty<=0) return showToast('Количество не сохранено','Введи число больше нуля.');
-  if(type==='writeoff'&&qty>i.stock) return showToast('Списание невозможно',`На складе только ${fmt(i.stock)} ${i.unit}.`);
+  openStockModal(id,type);
+}
+
+function cloudError(error){
+  const message=String(error?.message||'Не удалось выполнить операцию.');
+  if(/insufficient stock/i.test(message)) return 'На складе недостаточно ингредиентов.';
+  if(/inventory in progress/i.test(message)) return 'Сначала заверши или отмени инвентаризацию.';
+  if(/owner access required/i.test(message)) return 'Операция доступна только владельцу.';
+  if(/open shift not found/i.test(message)) return 'Открытая смена не найдена.';
+  return message;
+}
+async function loadCloudLocation(locationId){
+  const client=globalThis.EsepSupabase;
+  if(!client) throw new Error('Supabase client is unavailable');
+  const [ingredientsResult,productsResult,recipesResult,shiftsResult,salesResult,movementsResult,inventoriesResult,itemsResult]=await Promise.all([
+    client.from('ingredients').select('*').eq('location_id',locationId).order('created_at'),
+    client.from('products').select('*').eq('location_id',locationId).eq('active',true).order('created_at'),
+    client.from('product_recipes').select('product_id,ingredient_id,quantity').eq('location_id',locationId),
+    client.from('shifts').select('*').eq('location_id',locationId).order('opened_at'),
+    client.from('sales').select('*').eq('location_id',locationId).order('created_at'),
+    client.from('stock_movements').select('*').eq('location_id',locationId).order('created_at'),
+    client.from('inventories').select('*').eq('location_id',locationId).order('started_at'),
+    client.from('inventory_items').select('*').eq('location_id',locationId),
+  ]);
+  const failed=[ingredientsResult,productsResult,recipesResult,shiftsResult,salesResult,movementsResult,inventoriesResult,itemsResult].find(result=>result.error);
+  if(failed) throw failed.error;
+  const openShift=shiftsResult.data.find(row=>!row.closed_at);
+  if(!openShift) throw new Error('Open shift not found');
+  const periodIds=new Map(shiftsResult.data.map((row,index)=>[row.id,index+1]));
+  const recipesByProduct={};
+  recipesResult.data.forEach(row=>{(recipesByProduct[row.product_id]??={})[row.ingredient_id]=Number(row.quantity);});
+  const role=S.role;
+  const ingredients=ingredientsResult.data.map(row=>({id:row.id,code:row.code,name:row.name,unit:row.unit,stock:Number(row.stock),start:Number(row.initial_stock),threshold:Number(row.threshold),cost:Number(row.unit_cost)}));
+  const ingredientsById=new Map(ingredients.map(ingredient=>[ingredient.id,ingredient]));
+  const inventoryItemsById={};
+  itemsResult.data.forEach(row=>(inventoryItemsById[row.inventory_id]??=[]).push(row));
+  const mapInventory=row=>{
+    const items=(inventoryItemsById[row.id]||[]).map(item=>{
+      const ingredient=ingredientsById.get(item.ingredient_id);
+      const difference=Number(item.difference||0);
+      return {id:item.ingredient_id,name:ingredient?.name||'Ингредиент',unit:ingredient?.unit||'',theoretical:Number(item.theoretical),actual:Number(item.actual),difference,diff:difference,shortageValue:Number(item.shortage_value),overageValue:Number(item.overage_value),netValue:difference*(ingredient?.cost||0),leak:Number(item.shortage_value)};
+    });
+    return {id:row.id,periodId:periodIds.get(row.shift_id),closedAt:Date.parse(row.completed_at),items,total:Number(row.total_shortage)};
+  };
+  const completedInventories=inventoriesResult.data.filter(row=>row.status==='completed').map(mapInventory);
+  const draft=inventoriesResult.data.find(row=>row.status==='draft');
+  S={
+    schemaVersion:2,
+    ingredients,
+    products:productsResult.data.map(row=>({id:row.id,code:row.code,emoji:row.emoji,name:row.name,price:Number(row.price),recipe:recipesByProduct[row.id]||{}})),
+    sales:salesResult.data.map(row=>({id:row.id,productId:row.product_id,productName:row.product_name,unitPrice:Number(row.unit_price),cogs:Number(row.cogs),recipeSnapshot:Object.fromEntries(Object.entries(row.recipe_snapshot).map(([id,qty])=>[id,Number(qty)])),periodId:periodIds.get(row.shift_id),ts:Date.parse(row.created_at),canceledAt:row.canceled_at?Date.parse(row.canceled_at):null})),
+    role,
+    periods:shiftsResult.data.map((row,index)=>({id:index+1,openedAt:Date.parse(row.opened_at),closedAt:row.closed_at?Date.parse(row.closed_at):null})),
+    movements:movementsResult.data.map(row=>({id:row.id,periodId:periodIds.get(row.shift_id)||periodIds.get(openShift.id),ingredientId:row.ingredient_id,type:row.type==='sale_cancel'?'refund':row.type,qty:Number(row.quantity),note:row.note,sourceId:row.source_id,ts:Date.parse(row.created_at)})),
+    inventories:completedInventories,
+    lastInventory:completedInventories.at(-1)||null,
+    inventoryDraft:draft?{id:draft.id,periodId:periodIds.get(draft.shift_id),startedAt:Date.parse(draft.started_at),snapshot:Object.fromEntries((inventoryItemsById[draft.id]||[]).map(item=>[item.ingredient_id,Number(item.theoretical)])),actual:Object.fromEntries((inventoryItemsById[draft.id]||[]).filter(item=>item.actual!=null).map(item=>[item.ingredient_id,Number(item.actual)]))}:null,
+  };
+  cloudContext={locationId,shiftId:openShift.id};
+  document.getElementById('reset').hidden=true;
+  renderAll();
+}
+async function reloadCloudLocation(){if(cloudContext) await loadCloudLocation(cloudContext.locationId);}
+
+let pendingStockOperation=null;
+function openStockModal(id,type){
+  const ingredient=ing(id);
+  if(!ingredient) return;
+  pendingStockOperation={id,type};
+  const writeoff=type==='writeoff';
+  document.getElementById('stockModalEyebrow').textContent=ingredient.name;
+  document.getElementById('stockModalTitle').textContent=writeoff?'Списание':'Приход';
+  document.getElementById('stockUnit').textContent=`(${ingredient.unit})`;
+  document.getElementById('stockReasonField').hidden=!writeoff;
+  document.getElementById('stockReason').required=writeoff;
+  document.getElementById('stockSubmit').textContent=writeoff?'Сохранить списание':'Сохранить приход';
+  document.getElementById('stockComment').placeholder=writeoff?'Что произошло?':'Например, название поставщика';
+  document.getElementById('stockForm').reset();
+  clearStockErrors();
+  const modal=document.getElementById('stockModal');
+  modal.showModal();
+  document.getElementById('stockQuantity').focus();
+}
+function closeStockModal(){
+  document.getElementById('stockModal').close();
+  pendingStockOperation=null;
+}
+function clearStockErrors(){
+  ['stockQuantity','stockReason'].forEach(id=>document.getElementById(id).removeAttribute('aria-invalid'));
+  document.getElementById('stockQuantityError').textContent='';
+  document.getElementById('stockReasonError').textContent='';
+}
+async function submitStockOperation(event){
+  event.preventDefault();
+  if(!pendingStockOperation) return;
+  clearStockErrors();
+  const ingredient=ing(pendingStockOperation.id);
+  const quantityInput=document.getElementById('stockQuantity');
+  const reasonInput=document.getElementById('stockReason');
+  const qty=Number(String(quantityInput.value).replace(',','.'));
+  let invalid=false;
+  if(!Number.isFinite(qty)||qty<=0){
+    quantityInput.setAttribute('aria-invalid','true');
+    document.getElementById('stockQuantityError').textContent='Введите число больше нуля.';
+    invalid=true;
+  }else if(pendingStockOperation.type==='writeoff'&&qty>ingredient.stock){
+    quantityInput.setAttribute('aria-invalid','true');
+    document.getElementById('stockQuantityError').textContent=`На складе только ${fmt(ingredient.stock)} ${ingredient.unit}.`;
+    invalid=true;
+  }
+  if(pendingStockOperation.type==='writeoff'&&!reasonInput.value){
+    reasonInput.setAttribute('aria-invalid','true');
+    document.getElementById('stockReasonError').textContent='Укажите причину списания.';
+    invalid=true;
+  }
+  if(invalid) return;
+  const type=pendingStockOperation.type;
+  const comment=document.getElementById('stockComment').value.trim();
+  const note=[type==='writeoff'?reasonInput.value:'Поставка',comment].filter(Boolean).join(' · ');
+  if(cloudContext){
+    const submit=document.getElementById('stockSubmit');submit.disabled=true;
+    const {error}=await globalThis.EsepSupabase.rpc('adjust_stock',{
+      target_ingredient_id:ingredient.id,operation:type,amount:qty,operation_note:note,
+    });
+    submit.disabled=false;
+    if(error){showToast('Операция не сохранена',cloudError(error));return;}
+    closeStockModal();
+    await reloadCloudLocation();
+    showToast(type==='receipt'?'Приход сохранён':'Списание сохранено',`${ingredient.name}: ${type==='receipt'?'+':'−'}${fmt(qty)} ${ingredient.unit}`);
+    return;
+  }
   const delta=type==='receipt'?qty:-qty;
-  const saved=transact(()=>{i.stock+=delta;addMovement(id,type,delta);});
+  const saved=transact(()=>{ingredient.stock+=delta;addMovement(ingredient.id,type,delta,note);});
   if(!saved){renderStock();showToast('Операция не сохранена','Хранилище недоступно. Повтори операцию.');return;}
-  renderStock(); showToast(type==='receipt'?'Приход сохранён':'Списание сохранено',`${i.name}: ${delta>0?'+':''}${fmt(delta)} ${i.unit}`);
+  closeStockModal();
+  renderStock();
+  showToast(type==='receipt'?'Приход сохранён':'Списание сохранено',`${ingredient.name}: ${delta>0?'+':''}${fmt(delta)} ${ingredient.unit}`);
 }
 
 /* ---------- INVENTORY ---------- */
@@ -252,8 +399,15 @@ function renderInv(){
   t.querySelectorAll('input').forEach(inp=>inp.addEventListener('input',()=>recalcInv(true)));
   recalcInv(false);
 }
-function startInventory(){
+async function startInventory(){
   if(S.role!=='owner'||inventoryInProgress()) return;
+  if(cloudContext){
+    const {error}=await globalThis.EsepSupabase.rpc('start_inventory',{target_location_id:cloudContext.locationId});
+    if(error){showToast('Инвентаризация не начата',cloudError(error));return;}
+    await reloadCloudLocation();renderInv();
+    showToast('Инвентаризация начата','Продажи и складские операции временно приостановлены.');
+    return;
+  }
   const period=openPeriod();
   if(!transact(()=>{S.inventoryDraft={periodId:period.id,startedAt:Date.now(),snapshot:createInventorySnapshot(S.ingredients),actual:{}};})){
     showToast('Инвентаризация не начата','Хранилище недоступно.');return;
@@ -283,7 +437,8 @@ function recalcInv(persist=false){
     leakcell.className='leakcell num '+(diff>0?'var-leak':'var-ok');
     total+=leak;
   });
-  if(persist&&!transact(()=>{S.inventoryDraft.actual=actualById;})){
+  if(persist&&cloudContext){S.inventoryDraft.actual=actualById;}
+  else if(persist&&!transact(()=>{S.inventoryDraft.actual=actualById;})){
     document.querySelectorAll('#invTable tbody tr').forEach(tr=>{
       tr.querySelector('input').value=S.inventoryDraft.actual?.[tr.dataset.id]??'';
     });
@@ -294,7 +449,7 @@ function recalcInv(persist=false){
   const tot=document.getElementById('invTotal');
   if(tot){tot.textContent=complete?fmt(total)+' сом':'Не проверено';tot.className='num '+(complete&&total===0?'var-ok':'var-leak');}
 }
-function applyInv(){
+async function applyInv(){
   if(!inventoryInProgress()) return showToast('Инвентаризация не начата','Сначала нажми «Начать инвентаризацию».');
   const actualById={};
   let invalid=false;
@@ -305,6 +460,12 @@ function applyInv(){
   });
   if(invalid || Object.keys(actualById).length!==S.ingredients.length){
     showToast('Инвентаризация не закрыта','Введи фактический неотрицательный остаток для каждого ингредиента.');
+    return;
+  }
+  if(cloudContext){
+    const {error}=await globalThis.EsepSupabase.rpc('complete_inventory',{target_inventory_id:S.inventoryDraft.id,actual_stock:actualById});
+    if(error){showToast('Инвентаризация не закрыта',cloudError(error));return;}
+    await reloadCloudLocation();renderDash();switchView('dash');
     return;
   }
   const items=calculateInventory(S.ingredients,actualById,S.inventoryDraft.snapshot).map(item=>{
@@ -325,9 +486,16 @@ function applyInv(){
   if(!saved){renderInv();showToast('Инвентаризация не закрыта','Хранилище недоступно.');return;}
   renderDash(); switchView('dash');
 }
-function cancelInventory(){
+async function cancelInventory(){
   if(!inventoryInProgress()) return;
   if(!confirm('Отменить инвентаризацию? Введённые значения будут удалены.')) return;
+  if(cloudContext){
+    const {error}=await globalThis.EsepSupabase.rpc('cancel_inventory',{target_inventory_id:S.inventoryDraft.id});
+    if(error){showToast('Отмена не сохранена',cloudError(error));return;}
+    await reloadCloudLocation();switchView('kassa');
+    showToast('Инвентаризация отменена','Продажи и складские операции снова доступны.');
+    return;
+  }
   if(!transact(()=>{S.inventoryDraft=null;})){showToast('Отмена не сохранена','Хранилище недоступно.');return;}
   switchView('kassa'); renderAll();
   showToast('Инвентаризация отменена','Продажи и складские операции снова доступны.');
@@ -397,6 +565,78 @@ function renderPeriodHistory(){
   }).join('');
 }
 
+/* ---------- CATALOG ---------- */
+let catalogProducts=[];
+const catalogModal=document.getElementById('catalogModal');
+function catalogMessage(form,message){form.querySelector('[data-catalog-error]').textContent=message;}
+function catalogRpcError(error){
+  const message=String(error?.message||'Не удалось сохранить изменения.');
+  if(/duplicate key/i.test(message)) return 'Такой код уже используется в этой точке.';
+  if(/inventory in progress/i.test(message)) return 'Заверши или отмени инвентаризацию перед изменением каталога.';
+  if(/owner access required/i.test(message)) return 'Редактировать каталог может только владелец.';
+  return message;
+}
+async function loadCatalog(){
+  const [productsResult,recipesResult]=await Promise.all([
+    globalThis.EsepSupabase.from('products').select('*').eq('location_id',cloudContext.locationId).order('created_at'),
+    globalThis.EsepSupabase.from('product_recipes').select('product_id,ingredient_id,quantity').eq('location_id',cloudContext.locationId),
+  ]);
+  if(productsResult.error||recipesResult.error){showToast('Каталог не загружен',catalogRpcError(productsResult.error||recipesResult.error));return;}
+  const recipes={};recipesResult.data.forEach(row=>(recipes[row.product_id]??={})[row.ingredient_id]=Number(row.quantity));
+  catalogProducts=productsResult.data.map(row=>({...row,price:Number(row.price),recipe:recipes[row.id]||{}}));
+  renderCatalogLists();
+}
+function renderCatalogLists(){
+  const ingredientRoot=document.getElementById('catalogIngredientList');
+  ingredientRoot.innerHTML=S.ingredients.map(i=>`<div class="catalog-row"><div class="catalog-main"><b>${esc(i.name)}</b><span>${esc(i.code)} · остаток ${fmt(i.stock)} ${esc(i.unit)} · порог ${fmt(i.threshold)}</span></div><div class="catalog-value">${i.cost} сом/${esc(i.unit)}</div><button type="button" data-edit-ingredient="${i.id}">Изменить</button></div>`).join('');
+  const productRoot=document.getElementById('catalogProductList');
+  productRoot.innerHTML=catalogProducts.map(p=>`<div class="catalog-row${p.active?'':' inactive'}"><div class="catalog-main"><b>${esc(p.emoji)} ${esc(p.name)}</b><span>${esc(p.code)} · ${Object.keys(p.recipe).length} ингредиента</span></div><div class="catalog-value">${fmt(p.price)} сом</div><div class="catalog-actions"><button type="button" data-edit-product="${p.id}">Изменить</button><button type="button" data-toggle-product="${p.id}">${p.active?'Скрыть':'Вернуть'}</button></div></div>`).join('');
+  ingredientRoot.querySelectorAll('[data-edit-ingredient]').forEach(button=>button.onclick=()=>openIngredientForm(button.dataset.editIngredient));
+  productRoot.querySelectorAll('[data-edit-product]').forEach(button=>button.onclick=()=>openProductForm(button.dataset.editProduct));
+  productRoot.querySelectorAll('[data-toggle-product]').forEach(button=>button.onclick=()=>toggleProduct(button.dataset.toggleProduct));
+}
+function closeCatalogForms(){document.getElementById('ingredientForm').hidden=true;document.getElementById('productForm').hidden=true;}
+function openIngredientForm(id=null){
+  closeCatalogForms();const form=document.getElementById('ingredientForm');form.reset();form.hidden=false;
+  const ingredient=id?S.ingredients.find(item=>item.id===id):null;
+  form.elements.id.value=ingredient?.id||'';form.elements.name.value=ingredient?.name||'';form.elements.code.value=ingredient?.code||'';
+  form.elements.unit.value=ingredient?.unit||'';form.elements.stock.value=ingredient?.stock||0;form.elements.threshold.value=ingredient?.threshold||0;form.elements.cost.value=ingredient?.cost||0;
+  document.getElementById('ingredientFormTitle').textContent=ingredient?'Изменить ингредиент':'Новый ингредиент';
+  document.getElementById('openingStockField').hidden=Boolean(ingredient);catalogMessage(form,'');form.scrollIntoView({block:'nearest'});
+}
+function openProductForm(id=null){
+  closeCatalogForms();const form=document.getElementById('productForm');form.reset();form.hidden=false;
+  const product=id?catalogProducts.find(item=>item.id===id):null;
+  form.elements.id.value=product?.id||'';form.elements.name.value=product?.name||'';form.elements.code.value=product?.code||'';form.elements.emoji.value=product?.emoji||'';form.elements.price.value=product?.price||0;
+  document.getElementById('productFormTitle').textContent=product?'Изменить товар':'Новый товар';
+  document.getElementById('recipeEditor').innerHTML=S.ingredients.map(i=>`<div class="recipe-row"><span>${esc(i.name)}</span><label><input data-recipe-id="${i.id}" type="number" min="0" step="any" value="${product?.recipe[i.id]||0}"><small>${esc(i.unit)}</small></label></div>`).join('');
+  catalogMessage(form,'');form.scrollIntoView({block:'nearest'});
+}
+async function toggleProduct(id){
+  const product=catalogProducts.find(item=>item.id===id);if(!product)return;
+  const {error}=await globalThis.EsepSupabase.rpc('set_product_active',{target_product_id:id,enabled:!product.active});
+  if(error){showToast('Товар не изменён',catalogRpcError(error));return;}await reloadCloudLocation();await loadCatalog();
+}
+document.getElementById('ingredientForm').onsubmit=async event=>{
+  event.preventDefault();const form=event.currentTarget;const values=new FormData(form);const submit=form.querySelector('[type="submit"]');submit.disabled=true;catalogMessage(form,'');
+  const {error}=await globalThis.EsepSupabase.rpc('save_ingredient',{target_location_id:cloudContext.locationId,target_ingredient_id:values.get('id')||null,ingredient_code:String(values.get('code')).trim().toLowerCase(),ingredient_name:String(values.get('name')).trim(),ingredient_unit:String(values.get('unit')).trim(),opening_stock:Number(values.get('stock')),low_stock_threshold:Number(values.get('threshold')),cost_per_unit:Number(values.get('cost'))});
+  submit.disabled=false;if(error){catalogMessage(form,catalogRpcError(error));return;}closeCatalogForms();await reloadCloudLocation();await loadCatalog();showToast('Ингредиент сохранён','Каталог точки обновлён.');
+};
+document.getElementById('productForm').onsubmit=async event=>{
+  event.preventDefault();const form=event.currentTarget;const values=new FormData(form);const recipe={};
+  form.querySelectorAll('[data-recipe-id]').forEach(input=>{const quantity=Number(input.value);if(quantity>0)recipe[input.dataset.recipeId]=quantity;});
+  if(!Object.keys(recipe).length){catalogMessage(form,'Добавь хотя бы один ингредиент в техкарту.');return;}
+  const submit=form.querySelector('[type="submit"]');submit.disabled=true;catalogMessage(form,'');
+  const {error}=await globalThis.EsepSupabase.rpc('save_product',{target_location_id:cloudContext.locationId,target_product_id:values.get('id')||null,product_code:String(values.get('code')).trim().toLowerCase(),product_name:String(values.get('name')).trim(),product_emoji:String(values.get('emoji')).trim(),product_price:Number(values.get('price')),recipe});
+  submit.disabled=false;if(error){catalogMessage(form,catalogRpcError(error));return;}closeCatalogForms();await reloadCloudLocation();await loadCatalog();showToast('Товар сохранён','Цена и техкарта обновлены.');
+};
+document.getElementById('manageCatalog').onclick=async()=>{setAccountMenu(false);closeCatalogForms();catalogModal.showModal();await loadCatalog();};
+document.getElementById('catalogModalClose').onclick=()=>catalogModal.close();
+catalogModal.addEventListener('cancel',event=>{event.preventDefault();catalogModal.close();});
+document.getElementById('addIngredient').onclick=()=>openIngredientForm();document.getElementById('addProduct').onclick=()=>openProductForm();
+document.querySelectorAll('[data-close-catalog-form]').forEach(button=>button.onclick=closeCatalogForms);
+document.getElementById('catalogTabs').onclick=event=>{const button=event.target.closest('[data-catalog-view]');if(!button)return;document.querySelectorAll('[data-catalog-view]').forEach(item=>item.classList.toggle('on',item===button));document.getElementById('catalogProducts').hidden=button.dataset.catalogView!=='products';document.getElementById('catalogIngredients').hidden=button.dataset.catalogView!=='ingredients';closeCatalogForms();};
+
 /* ---------- shell ---------- */
 function switchView(v){
   if(S.role==='barista'&&(v==='stock'||v==='inv'||v==='dash')){ showToast('Раздел владельца','Бариста работает только с кассой.'); v='kassa'; }
@@ -407,14 +647,29 @@ function switchView(v){
 }
 function renderAll(){ renderKassa(); renderStock(); if(document.getElementById('v-inv').classList.contains('on')) renderInv(); if(document.getElementById('v-dash').classList.contains('on')) renderDash(); }
 function applyRole(){
-  document.getElementById('role').value=S.role;
+  document.getElementById('roleLabel').textContent=S.role==='owner'?'Владелец':'Бариста';
   document.querySelectorAll('.owner-only').forEach(el=>el.style.display=S.role==='owner'?'':'none');
   document.querySelectorAll('.tabs button').forEach(b=>{ if(b.dataset.v==='stock'||b.dataset.v==='inv'||b.dataset.v==='dash') b.style.display=S.role==='owner'?'':'none'; });
 }
+function setAuthenticatedRole(role){
+  if(role!=='owner'&&role!=='barista') return;
+  if(S.role!==role) transact(()=>{S.role=role;});
+  applyRole();
+  const current=document.querySelector('.view.on')?.id.replace('v-','')||'kassa';
+  const protectedView=current==='stock'||current==='inv'||current==='dash';
+  switchView(role==='barista'&&protectedView?'kassa':current);
+  renderAll();
+}
 
 document.getElementById('tabs').addEventListener('click',e=>{const b=e.target.closest('button'); if(b) switchView(b.dataset.v);});
+const accountToggle=document.getElementById('accountToggle');
+const accountMenu=document.getElementById('accountMenu');
+function setAccountMenu(open){accountMenu.hidden=!open;accountToggle.setAttribute('aria-expanded',String(open));}
+accountToggle.onclick=()=>setAccountMenu(accountMenu.hidden);
+document.addEventListener('click',event=>{if(!accountMenu.hidden&&!event.target.closest('.account')) setAccountMenu(false);});
 document.getElementById('reset').onclick=()=>{if(confirm('Сбросить демо к начальным данным?')){
-  if(!transact(()=>{S=SEED();})){showToast('Сброс не сохранён','Хранилище недоступно.');return;}
+  const authenticatedRole=S.role;
+  if(!transact(()=>{S=SEED();S.role=authenticatedRole;})){showToast('Сброс не сохранён','Хранилище недоступно.');return;}
   switchView('kassa');renderAll();
 }};
 document.getElementById('applyInv').onclick=applyInv;
@@ -423,19 +678,10 @@ document.getElementById('fillTheory').onclick=fillTheory;
 document.getElementById('simLeak').onclick=simLeak;
 document.getElementById('cancelInv').onclick=cancelInventory;
 document.getElementById('undoSale').onclick=cancelLastSale;
-document.getElementById('role').onchange=e=>{
-  const current=document.querySelector('.view.on')?.id.replace('v-','')||'kassa';
-  const nextRole=e.target.value;
-  if(inventoryInProgress()&&nextRole==='barista'){
-    e.target.value='owner';
-    showToast('Роль не изменена','Сначала заверши или отмени текущую инвентаризацию.');
-    return;
-  }
-  if(!transact(()=>{S.role=nextRole;})){e.target.value=S.role;showToast('Роль не изменена','Хранилище недоступно.');return;}
-  applyRole();
-  const protectedView=current==='stock'||current==='inv'||current==='dash';
-  switchView(S.role==='barista'&&protectedView?'kassa':current);
-  renderAll();
-};
+document.getElementById('stockForm').onsubmit=submitStockOperation;
+document.getElementById('stockModalClose').onclick=closeStockModal;
+document.getElementById('stockModalCancel').onclick=closeStockModal;
+document.getElementById('stockModal').addEventListener('cancel',event=>{event.preventDefault();closeStockModal();});
 
 applyRole(); renderAll();
+globalThis.EsepApp={loadCloudLocation,setRole:setAuthenticatedRole,showToast};
