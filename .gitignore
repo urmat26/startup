@@ -5,3 +5,4 @@ dist/
 build/
 *.svg.png
 .git-corrupted-from-archive/
+opencode.json
