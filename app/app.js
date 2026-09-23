@@ -43,6 +43,7 @@ const LEGACY_KEY='esep-demo-v1';
 const LEGACY_BACKUP_KEY='esep-demo-v1-backup';
 let S=initializeState();
 let cloudContext=null;
+let currentUserId=null;
 function migrateLegacyState(legacy){
   return migrateLegacyStateData(legacy);
 }
@@ -126,16 +127,21 @@ async function sell(p){
 }
 async function cancelLastSale(){
   if(inventoryInProgress()) return showToast('Отмена приостановлена','Заверши или отмени текущую инвентаризацию.');
-  const sale=[...S.sales].reverse().find(x=>x.periodId===openPeriod().id&&x.canceledAt==null);
-  if(!sale) return showToast('Отменять нечего','В текущей смене нет активных продаж.');
+  let sale;
   if(cloudContext){
+    if(S.role==='barista'&&!currentUserId) return showToast('Отмена недоступна','Войдите заново.');
+    const pool=[...S.sales].reverse().filter(x=>x.periodId===openPeriod().id&&x.canceledAt==null);
+    sale=S.role==='owner'?pool[0]:pool.find(x=>x.soldBy===currentUserId);
+    if(!sale) return showToast('Отменять нечего',S.role==='owner'?'В текущей смене нет активных продаж.':'У вас нет продаж для отмены в этой смене.');
     const button=document.getElementById('undoSale');button.disabled=true;
     const {error}=await globalThis.EsepSupabase.rpc('cancel_sale',{target_sale_id:sale.id});
-    if(error){button.disabled=false;showToast('Продажа не отменена',cloudError(error));return;}
+    if(error){button.disabled=false;const msg=cloudError(error);if(/Can only cancel own sale/i.test(error.message)) showToast('Отмена недоступна','Бариста может отменить только свою продажу.'); else showToast('Продажа не отменена',msg);return;}
     await reloadCloudLocation();
     showToast('Продажа отменена','Ингредиенты возвращены на облачный склад.');
     return;
   }
+  sale=[...S.sales].reverse().find(x=>x.periodId===openPeriod().id&&x.canceledAt==null);
+  if(!sale) return showToast('Отменять нечего','В текущей смене нет активных продаж.');
   const product=S.products.find(p=>p.id===sale.productId);
   const recipe=sale.recipeSnapshot||product?.recipe;
   if(!recipe) return showToast('Продажа не отменена','Состав исходной продажи не найден.');
@@ -703,6 +709,7 @@ function setAuthenticatedRole(role){
   switchView(role==='barista'&&protectedView?'kassa':current);
   renderAll();
 }
+function setCurrentUserId(userId){ currentUserId=userId; }
 
 document.getElementById('tabs').addEventListener('click',e=>{const b=e.target.closest('button'); if(b) switchView(b.dataset.v);});
 const accountToggle=document.getElementById('accountToggle');
@@ -727,4 +734,4 @@ document.getElementById('stockModalCancel').onclick=closeStockModal;
 document.getElementById('stockModal').addEventListener('cancel',event=>{event.preventDefault();closeStockModal();});
 
 applyRole(); renderAll();
-globalThis.EsepApp={loadCloudLocation,setRole:setAuthenticatedRole,showToast};
+globalThis.EsepApp={loadCloudLocation,setRole:setAuthenticatedRole,setCurrentUserId,showToast, get currentUserId(){ return currentUserId; }};

@@ -140,6 +140,7 @@
     document.getElementById('locationName').textContent = locationData.name;
     document.getElementById('profileName').textContent = profile.full_name || 'Пользователь';
     document.getElementById('profileEmail').textContent = user.email || '';
+    global.EsepApp?.setCurrentUserId?.(user.id);
     await global.EsepApp?.loadCloudLocation(locationData.id);
     global.EsepApp?.setRole(membership.role);
     showApp();
@@ -365,6 +366,7 @@
 
   async function signOut() {
     showLoading();
+    global.EsepApp?.setCurrentUserId?.(null);
     const { error } = await client.auth.signOut();
     if (error) {
       showApp();
