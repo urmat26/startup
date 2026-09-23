@@ -230,6 +230,10 @@ function adjustStock(id,type){
 
 function cloudError(error){
   const message=String(error?.message||'Не удалось выполнить операцию.');
+  if(/Failed to fetch|ERR_NAME_NOT_RESOLVED|NetworkError|shutting down|connection terminated|timeout/i.test(message)){
+    globalThis.EsepOffline?.show();
+    return 'Нет связи с сервером. Проверьте интернет — сервер просыпается после паузы, подождите 10 сек и обновите страницу.';
+  }
   if(/insufficient stock/i.test(message)) return 'На складе недостаточно ингредиентов.';
   if(/inventory in progress/i.test(message)) return 'Сначала заверши или отмени инвентаризацию.';
   if(/owner access required/i.test(message)) return 'Операция доступна только владельцу.';
@@ -275,7 +279,7 @@ async function loadCloudLocation(locationId){
     schemaVersion:2,
     ingredients,
     products:productsResult.data.map(row=>({id:row.id,code:row.code,emoji:row.emoji,name:row.name,price:Number(row.price),recipe:recipesByProduct[row.id]||{}})),
-    sales:salesResult.data.map(row=>({id:row.id,productId:row.product_id,productName:row.product_name,unitPrice:Number(row.unit_price),cogs:Number(row.cogs),recipeSnapshot:Object.fromEntries(Object.entries(row.recipe_snapshot).map(([id,qty])=>[id,Number(qty)])),periodId:periodIds.get(row.shift_id),ts:Date.parse(row.created_at),canceledAt:row.canceled_at?Date.parse(row.canceled_at):null})),
+    sales:salesResult.data.map(row=>({id:row.id,productId:row.product_id,productName:row.product_name,unitPrice:Number(row.unit_price),cogs:Number(row.cogs),recipeSnapshot:Object.fromEntries(Object.entries(row.recipe_snapshot).map(([id,qty])=>[id,Number(qty)])),periodId:periodIds.get(row.shift_id),ts:Date.parse(row.created_at),canceledAt:row.canceled_at?Date.parse(row.canceled_at):null,soldBy:row.sold_by})),
     role,
     periods:shiftsResult.data.map((row,index)=>({id:index+1,openedAt:Date.parse(row.opened_at),closedAt:row.closed_at?Date.parse(row.closed_at):null})),
     movements:movementsResult.data.map(row=>({id:row.id,periodId:periodIds.get(row.shift_id)||periodIds.get(openShift.id),ingredientId:row.ingredient_id,type:row.type==='sale_cancel'?'refund':row.type,qty:Number(row.quantity),note:row.note,sourceId:row.source_id,ts:Date.parse(row.created_at)})),
@@ -521,6 +525,7 @@ function renderDash(){
   const big=document.getElementById('leakBig'), exp=document.getElementById('leakExp');
   const bl=document.getElementById('breakList');
   renderPeriodHistory();
+  void renderBaristaReport();
   if(!S.lastInventory){
     big.textContent='—'; big.className='big ok';
     exp.innerHTML='Сделай <b>инвентаризацию</b> — и Эсеп покажет, сколько денег утекло помимо проданных чашек.';
@@ -562,6 +567,44 @@ function renderPeriodHistory(){
       <div class="metric">${cups}<span>чашек</span></div>
       <div class="metric">${fmt(inv?.total||0)} сом<span>утечка</span></div>
     </div>`;
+  }).join('');
+}
+async function renderBaristaReport(){
+  const container=document.getElementById('baristaShiftReport');
+  const root=document.getElementById('baristaReportList');
+  if(!container||!root) return;
+  if(S.role!=='owner'){ container.hidden=true; return; }
+  container.hidden=false;
+  if(!cloudContext){
+    root.innerHTML='<div class="muted" style="font-size:14px">Демо-режим — данные по бариста появятся после входа.</div>';
+    return;
+  }
+  const periodId=openPeriod().id;
+  const sales=periodSales(periodId);
+  if(!sales.length){
+    root.innerHTML='<div class="muted" style="font-size:14px">Ещё нет продаж в этой смене.</div>';
+    return;
+  }
+  root.innerHTML='<div class="muted" style="font-size:14px">Загружаем смену…</div>';
+  const groups=new Map();
+  sales.forEach(s=>{
+    const key=s.soldBy||'unknown';
+    const g=groups.get(key)||{count:0,revenue:0};
+    g.count+=1; g.revenue+=Number(s.unitPrice||0);
+    groups.set(key,g);
+  });
+  let team=[];
+  try{
+    const {data,error}=await globalThis.EsepSupabase.rpc('get_team_members');
+    if(!error&&Array.isArray(data)) team=data;
+  }catch{}
+  const nameById=new Map(team.map(m=>[m.user_id, m.full_name||m.email||'Бариста']));
+  const sorted=[...groups.entries()].sort((a,b)=>b[1].revenue-a[1].revenue);
+  const max=Math.max(...sorted.map(([,v])=>v.revenue),1);
+  root.innerHTML=sorted.map(([userId,stats])=>{
+    const name=nameById.get(userId)||(userId==='unknown'?'Неизвестно':String(userId).slice(0,8));
+    const width=Math.round(stats.revenue/max*100);
+    return `<div class="brow"><span class="bn">${esc(name)}</span><div class="bbar"><span style="width:${width}%"></span></div><span class="bv">${stats.count} чашек · ${fmt(Math.round(stats.revenue))} сом</span></div>`;
   }).join('');
 }
 

@@ -12,6 +12,12 @@
   button{font-family:inherit;cursor:pointer;min-height:44px}
   button:disabled{cursor:not-allowed;opacity:.48}
 
+  .offline-banner{position:sticky;top:0;z-index:30;background:#241A15;color:var(--cream);padding:10px 16px;border-bottom:1px solid rgba(224,164,88,.3)}
+  .offline-banner-inner{max-width:1180px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:13px}
+  .offline-banner-inner span{line-height:1.4}
+  .offline-banner button{flex:none;min-height:36px;padding:0 14px;border:1px solid rgba(250,246,241,.3);border-radius:8px;background:var(--crema);color:var(--espresso);font-weight:700;font-size:12px}
+  .offline-banner button:hover{background:var(--crema-deep);color:#fff}
+
   /* authentication */
   .auth-loading{min-height:100%;display:grid;place-content:center;gap:16px;text-align:center;color:var(--gray);font-size:13px}
   .auth-loading-mark{display:flex;align-items:flex-end;justify-content:center;font:800 42px var(--display);letter-spacing:-2px;color:var(--espresso)}

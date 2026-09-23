@@ -70,8 +70,15 @@
     form.querySelectorAll('input,button').forEach((element) => { element.disabled = submitting; });
   }
 
+  function isNetworkError(message) {
+    return /Failed to fetch|ERR_NAME_NOT_RESOLVED|NetworkError|shutting down|connection terminated|timeout/i.test(message);
+  }
   function authError(error) {
     const message = String(error?.message || 'Не удалось выполнить запрос.');
+    if (isNetworkError(message)) {
+      global.EsepOffline?.show();
+      return 'Нет связи с сервером. Проверьте интернет — сервер просыпается после паузы, подождите 10 сек и обновите страницу.';
+    }
     if (/invalid login credentials/i.test(message)) return 'Неверный email или пароль.';
     if (/user already registered/i.test(message)) return 'Аккаунт с таким email уже существует.';
     if (/email not confirmed/i.test(message)) return 'Подтвердите email по ссылке из письма.';

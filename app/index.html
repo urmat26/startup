@@ -8,6 +8,12 @@
 <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
+<div class="offline-banner" id="offlineBanner" hidden role="status" aria-live="polite">
+  <div class="offline-banner-inner">
+    <span>☕ Сервис засыпал — будим сервер, подождите 10 сек и обновите страницу</span>
+    <button id="offlineRetry" type="button">Обновить</button>
+  </div>
+</div>
 <div class="auth-loading" id="authLoading">
   <div class="auth-loading-mark">эсеп<span></span></div>
   <div>Загружаем кофейню…</div>
@@ -180,6 +186,10 @@
     <div class="break">
       <h4>Где утекло</h4>
       <div id="breakList"><div class="muted" style="font-size:14px">Сделай инвентаризацию, чтобы увидеть разбивку утечки по продуктам.</div></div>
+    </div>
+    <div class="break owner-only" id="baristaShiftReport">
+      <h4>Продажи по бариста — текущая смена</h4>
+      <div id="baristaReportList"><div class="muted" style="font-size:14px">Ещё нет продаж в этой смене.</div></div>
     </div>
     <div class="history">
       <h4>История смен</h4>
